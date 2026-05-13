@@ -1,23 +1,23 @@
 import express from "express"
 
-const expenseRouter = express.Router()
+const expenseRoute = express.Router()
 
-expenseRouter.post("/",)
+expenseRoute.post("/",)
 
-expenseRouter.get("/",)
+expenseRoute.get("/",)
 
-expenseRouter.get("/recent",)
+expenseRoute.get("/recent",)
 
-expenseRouter.get("/search",)
+expenseRoute.get("/search",)
 
-expenseRouter.get("/:id",)
+expenseRoute.get("/:id",)
 
-expenseRouter.put("/:id",)
+expenseRoute.put("/:id",)
 
-expenseRouter.delete("/:id",)
+expenseRoute.delete("/:id",)
 
-expenseRouter.put("/:id/favourite",)
+expenseRoute.put("/:id/favourite",)
 
-expenseRouter.post("/:id/duplicate",)
+expenseRoute.post("/:id/duplicate",)
 
-export default expenseRouter
+export default expenseRoute

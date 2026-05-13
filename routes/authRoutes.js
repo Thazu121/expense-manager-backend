@@ -5,15 +5,15 @@ import {
   loginUser,
 } from "../controllers/authController.js";
 
-const authRouter = express.Router()
+const authRoute = express.Router()
 
-authRouter.post("/register", registerUser)
+authRoute.post("/register", registerUser)
 
-authRouter.post("/login", loginUser)
+authRoute.post("/login", loginUser)
 
-authRouter.get("/profile",)
-authRouter.put("profile",)
-authRouter.put("/change-password")
-authRouter.post("/logout")
+authRoute.get("/profile",)
+authRoute.put("profile",)
+authRoute.put("/change-password")
+authRoute.post("/logout")
 
-export default authRouter
+export default authRoute

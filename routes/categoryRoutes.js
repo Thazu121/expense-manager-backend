@@ -1,13 +1,13 @@
 import express from "express"
 
 
-const categoryRouter = express.Router()
+const categoryRoute = express.Router()
 
-categoryRouter.post("/")
-categoryRouter.get("/categories")
-categoryRouter.get("/:id",)
-categoryRouter.put("/:id",)
-categoryRouter.delete("/:id")
+categoryRoute.post("/")
+categoryRoute.get("/categories")
+categoryRoute.get("/:id",)
+categoryRoute.put("/:id",)
+categoryRoute.delete("/:id")
 
 
-export default categoryRouter
+export default categoryRoute

@@ -1,9 +1,9 @@
 import express from "express"
 
-const receiptRouter=express.Router()
+const receiptRoute=express.Router()
 
-receiptRouter.post("/upload")
-receiptRouter.get("/")
-receiptRouter.get("/gallery")
-receiptRouter.get("/:id")
-receiptRouter.delete("/:id")
+receiptRoute.post("/upload")
+receiptRoute.get("/")
+receiptRoute.get("/gallery")
+receiptRoute.get("/:id")
+receiptRoute.delete("/:id")
