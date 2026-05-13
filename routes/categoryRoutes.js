@@ -3,11 +3,11 @@ import express from "express"
 
 const categoryRouter = express.Router()
 
-categoryRouter.post("/categories")
+categoryRouter.post("/")
 categoryRouter.get("/categories")
-categoryRouter.get("/categories/:id",)
-categoryRouter.put("/categories/:id",)
-categoryRouter.delete("/categories/:id")
+categoryRouter.get("/:id",)
+categoryRouter.put("/:id",)
+categoryRouter.delete("/:id")
 
 
 export default categoryRouter
