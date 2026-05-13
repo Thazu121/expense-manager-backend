@@ -19,5 +19,6 @@ expenseRoute.delete("/:id",)
 expenseRoute.put("/:id/favourite",)
 
 expenseRoute.post("/:id/duplicate",)
+// expenseRoute.put("/:id/receipt")
 
 export default expenseRoute

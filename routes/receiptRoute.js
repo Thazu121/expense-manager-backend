@@ -7,3 +7,4 @@ receiptRoute.get("/")
 receiptRoute.get("/gallery")
 receiptRoute.get("/:id")
 receiptRoute.delete("/:id")
+export default receiptRoute
