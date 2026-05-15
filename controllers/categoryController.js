@@ -81,6 +81,7 @@ const getSingleCategory=async (req,res,next) => {
 
 const updateCategory = async (req,res,next) => {
     try {
+        const { name, icon, color, type } = req.body
          const category= await categoryModel.findOne({
             _id:req.params.id,
             userid:req.user.id,
@@ -107,4 +108,37 @@ const updateCategory = async (req,res,next) => {
         next(error)
     }
     
+}
+
+const deleteCategory = async (
+  req,
+  res,
+  next
+) => {
+  try {
+
+    const category =
+      await categoryModel.findOne({
+        _id: req.params.id,
+        userId: req.user.id,
+      })
+
+    if (!category) {
+      return res.status(404).json({
+        success: false,
+        message: "Category not found",
+      })
+    }
+
+    await category.deleteOne();
+
+    return res.status(200).json({
+      success: true,
+      message:
+        "Category deleted successfully",
+    })
+
+  } catch (error) {
+    next(error);
+  }
 }
