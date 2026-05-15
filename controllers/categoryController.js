@@ -1,0 +1,38 @@
+import { categoryModel } from "../models/categoryModel.js";
+
+
+const createCategory=async (req,res,next) => {
+    try {
+        const {name,icon,color,type}=req.body
+        if(!name){
+            return res.status(400).json({
+                success:false,
+                message:"Category name is required"})
+        }
+        const existingCategory =await categoryModel.findOne({
+            userId:req.user.id,
+            name:name.toLowerCase()
+        })
+        if(existingCategory){
+            return res.status(400).json({
+                success:false,
+                message:"Category already exists"
+            })
+        }
+        const category=await categoryModel.create({
+            userId:req.user.id,
+            name,
+            icon,
+            color,
+            type
+        })
+        return res.status(201).json({
+            success:true,
+            message:"Category created successfully",
+            category
+        })
+
+    } catch (error) {
+        next(error)
+    }
+}
