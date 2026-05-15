@@ -36,3 +36,19 @@ const createCategory=async (req,res,next) => {
         next(error)
     }
 }
+const getAllCategory=async (req,res,next) => {
+    try {
+        const categories=await categoryModel.find({
+            userId:req.user.id
+            
+        })
+        return res.status(200).json({
+            success:true,
+            count:categories.length,
+            categories
+        })
+    } catch (error) {
+        next(error)
+    }
+    
+}
