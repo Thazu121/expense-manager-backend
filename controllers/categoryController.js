@@ -50,5 +50,28 @@ const getAllCategory=async (req,res,next) => {
     } catch (error) {
         next(error)
     }
+
+    
+}
+
+const getSingleCategory=async (req,res,next) => {
+    try {
+        const category= await categoryModel.findOne({
+            _id:req.params.id,
+            userid:req.user.id,
+        })
+        if(!category){
+            return res.status(400).json({
+                success:false,
+                message:"Category not found"
+            })
+        }
+        return res.status(200).json({
+            success:true,
+            category
+        })
+    } catch (error) {
+      next(error)  
+    }
     
 }
