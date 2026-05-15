@@ -73,5 +73,38 @@ const getSingleCategory=async (req,res,next) => {
     } catch (error) {
       next(error)  
     }
+
+
+    
+}
+
+
+const updateCategory = async (req,res,next) => {
+    try {
+         const category= await categoryModel.findOne({
+            _id:req.params.id,
+            userid:req.user.id,
+        })
+        if(!category){
+            return res.status(400).json({
+                success:false,
+                message:"Category not found"
+            })
+        }
+
+        category.name=name||category.name
+        category.icon=icon||category.icon
+        category.color=color||category.color
+        category.type=type||category.type
+        await category.save()
+
+        return res.status(200).json({
+            success:true,
+            message:"Category updated successfully",
+            category
+        })
+    } catch (error) {
+        next(error)
+    }
     
 }
