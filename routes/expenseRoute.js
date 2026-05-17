@@ -1,26 +1,84 @@
-import express from "express"
-import authMiddleware from "../middlewares/authMiddleware.js"
-import { createExpense, deleteExpense, getExpenses, getSingleExpense, toggleFavoriteExpense, updateExpense } from "../controllers/expenseController.js"
+import express from "express";
 
-const expenseRoute = express.Router()
+import authMiddleware
+from "../middlewares/authMiddleware.js";
 
-expenseRoute.post("/",authMiddleware,createExpense)
+import {
+  createExpense,
+  getExpenses,
+  getSingleExpense,
+  updateExpense,
+  deleteExpense,
+  toggleFavoriteExpense,
+  getRecentExpenses,
+  searchExpenses,
+  duplicateExpense,
+} from "../controllers/expenseController.js";
 
-expenseRoute.get("/",authMiddleware,getExpenses)
+const expenseRoute =
+  express.Router()
 
-expenseRoute.get("/recent",)
 
-expenseRoute.get("/search",)
 
-expenseRoute.get("/:id",authMiddleware,getSingleExpense)
+expenseRoute.post(
+  "/",
+  authMiddleware,
+  createExpense
+)
 
-expenseRoute.put("/:id",authMiddleware,updateExpense)
+expenseRoute.get(
+  "/",
+  authMiddleware,
+  getExpenses
+)
 
-expenseRoute.delete("/:id",authMiddleware,deleteExpense)
+expenseRoute.get(
+  "/recent",
+  authMiddleware,
+  getRecentExpenses
+)
 
-expenseRoute.put("/:id/favourite",authMiddleware,toggleFavoriteExpense)
+expenseRoute.get(
+  "/search",
+  authMiddleware,
+  searchExpenses
+)
 
-expenseRoute.post("/:id/duplicate",)
-// expenseRoute.put("/:id/receipt")
+
+
+expenseRoute.get(
+  "/:id",
+  authMiddleware,
+  getSingleExpense
+)
+expenseRoute.put(
+  "/:id",
+  authMiddleware,
+  updateExpense
+)
+
+
+expenseRoute.delete(
+  "/:id",
+  authMiddleware,
+  deleteExpense
+)
+
+
+expenseRoute.put(
+  "/:id/favorite",
+  authMiddleware,
+  toggleFavoriteExpense
+)
+
+
+
+expenseRoute.post(
+  "/:id/duplicate",
+  authMiddleware,
+  duplicateExpense
+)
+
+
 
 export default expenseRoute

@@ -14,12 +14,14 @@ const app = express()
 
 app.use(cors())
 app.use(express.json())
+app.use("/uploads",express.static("uploads"))
 app.use("/auth",authRoute)
 app.use("/expenses",expenseRoute)
 app.use("/categories",categoryRoute)
 app.use("/receipts",receiptRoute)
 app.use("/report",reportRoute)
 app.use("/notification",notificationRoute)
+
 
 const PORT = process.env.PORT || 5000
 
