@@ -130,7 +130,7 @@ const deleteCategory = async (
       })
     }
 
-    await category.deleteOne();
+    await category.deleteOne()
 
     return res.status(200).json({
       success: true,
@@ -139,6 +139,15 @@ const deleteCategory = async (
     })
 
   } catch (error) {
-    next(error);
+    next(error)
   }
+}
+
+
+export {
+    createCategory,
+    getAllCategory,
+    getSingleCategory,
+    updateCategory,
+    deleteCategory
 }
