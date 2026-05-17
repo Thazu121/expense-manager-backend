@@ -1,5 +1,4 @@
-import { expenseModel } from "../models/expenseModel.js"
-
+import { expenseModel } from "../models/expenseModel.js";
 
 
 
@@ -13,17 +12,21 @@ const createExpense = async (
     const {
       title,
       amount,
-      category,
+      categoryId,
+      merchant,
       paymentMethod,
       notes,
+      tags,
       source,
-      date,
+      expenseDate,
+      isRecurring,
+      recurringType,
     } = req.body
 
     if (
       !title ||
       !amount ||
-      !category
+      !categoryId
     ) {
       return res.status(400).json({
         success: false,
@@ -37,11 +40,15 @@ const createExpense = async (
         userId: req.user.id,
         title,
         amount,
-        category,
+        categoryId,
+        merchant,
         paymentMethod,
         notes,
+        tags,
         source,
-        date,
+        expenseDate,
+        isRecurring,
+        recurringType,
       })
 
     return res.status(201).json({
@@ -58,7 +65,6 @@ const createExpense = async (
 
 
 
-
 const getExpenses = async (
   req,
   res,
@@ -66,24 +72,150 @@ const getExpenses = async (
 ) => {
   try {
 
+    const {
+      categoryId,
+      paymentMethod,
+      startDate,
+      endDate,
+      search,
+      sort,
+      page = 1,
+      limit = 10,
+      favorite,
+    } = req.query;
+
+    let filter = {
+      userId: req.user.id,
+    }
+
+
+    if (categoryId) {
+      filter.categoryId =
+        categoryId
+    }
+
+
+    if (paymentMethod) {
+      filter.paymentMethod =
+        paymentMethod
+    }
+
+
+    if (favorite === "true") {
+      filter.favorite = true;
+    }
+
+
+    if (startDate && endDate) {
+      filter.expenseDate = {
+        $gte: new Date(startDate),
+        $lte: new Date(endDate),
+      }
+    }
+
+
+    if (search) {
+      filter.$or = [
+        {
+          title: {
+            $regex: search,
+            $options: "i",
+          },
+        },
+
+        {
+          notes: {
+            $regex: search,
+            $options: "i",
+          },
+        },
+
+        {
+          merchant: {
+            $regex: search,
+            $options: "i",
+          },
+        },
+      ];
+    }
+
+
+
+    let sortOption = {
+      createdAt: -1,
+    }
+
+    if (sort === "latest") {
+      sortOption = {
+        createdAt: -1,
+      }
+    }
+
+    if (sort === "oldest") {
+      sortOption = {
+        createdAt: 1,
+      }
+    }
+
+    if (sort === "highest") {
+      sortOption = {
+        amount: -1,
+      }
+    }
+
+    if (sort === "lowest") {
+      sortOption = {
+        amount: 1,
+      }
+    }
+
+
+
+    const skip =
+      (page - 1) * limit;
+
+
+
     const expenses =
       await expenseModel
-        .find({
-          userId: req.user.id,
-        })
-        .sort({ createdAt: -1 })
+        .find(filter)
+        .populate(
+          "categoryId",
+          "name icon color"
+        )
+        .sort(sortOption)
+        .skip(skip)
+        .limit(Number(limit));
+
+
+
+    const totalExpenses =
+      await expenseModel.countDocuments(
+        filter
+      )
+
+
 
     return res.status(200).json({
       success: true,
+
+      currentPage: Number(page),
+
+      totalPages: Math.ceil(
+        totalExpenses / limit
+      ),
+
+      totalExpenses,
+
       count: expenses.length,
+
       expenses,
     })
 
   } catch (error) {
-    next(error)
+    next(error);
   }
 }
-
 
 
 
@@ -95,15 +227,21 @@ const getSingleExpense = async (
   try {
 
     const expense =
-      await expenseModel.findOne({
-        _id: req.params.id,
-        userId: req.user.id,
-      })
+      await expenseModel
+        .findOne({
+          _id: req.params.id,
+          userId: req.user.id,
+        })
+        .populate(
+          "categoryId",
+          "name icon color"
+        )
 
     if (!expense) {
       return res.status(404).json({
         success: false,
-        message: "Expense not found",
+        message:
+          "Expense not found",
       })
     }
 
@@ -116,7 +254,6 @@ const getSingleExpense = async (
     next(error)
   }
 }
-
 
 
 
@@ -130,11 +267,15 @@ const updateExpense = async (
     const {
       title,
       amount,
-      category,
+      categoryId,
+      merchant,
       paymentMethod,
       notes,
+      tags,
       source,
-      date,
+      expenseDate,
+      isRecurring,
+      recurringType,
     } = req.body
 
     const expense =
@@ -146,7 +287,8 @@ const updateExpense = async (
     if (!expense) {
       return res.status(404).json({
         success: false,
-        message: "Expense not found",
+        message:
+          "Expense not found",
       })
     }
 
@@ -156,8 +298,12 @@ const updateExpense = async (
     expense.amount =
       amount || expense.amount
 
-    expense.category =
-      category || expense.category
+    expense.categoryId =
+      categoryId ||
+      expense.categoryId
+
+    expense.merchant =
+      merchant || expense.merchant
 
     expense.paymentMethod =
       paymentMethod ||
@@ -166,13 +312,25 @@ const updateExpense = async (
     expense.notes =
       notes || expense.notes
 
+    expense.tags =
+      tags || expense.tags
+
     expense.source =
       source || expense.source
 
-    expense.date =
-      date || expense.date
+    expense.expenseDate =
+      expenseDate ||
+      expense.expenseDate
 
-    await expense.save();
+    expense.isRecurring =
+      isRecurring ??
+      expense.isRecurring
+
+    expense.recurringType =
+      recurringType ||
+      expense.recurringType
+
+    await expense.save()
 
     return res.status(200).json({
       success: true,
@@ -185,7 +343,6 @@ const updateExpense = async (
     next(error)
   }
 }
-
 
 
 
@@ -205,23 +362,23 @@ const deleteExpense = async (
     if (!expense) {
       return res.status(404).json({
         success: false,
-        message: "Expense not found",
+        message:
+          "Expense not found",
       })
     }
 
-    await expense.deleteOne()
+    await expense.deleteOne();
 
     return res.status(200).json({
       success: true,
       message:
         "Expense deleted successfully",
-    })
+    });
 
   } catch (error) {
-    next(error)
+    next(error);
   }
 }
-
 
 
 
@@ -261,6 +418,152 @@ const toggleFavoriteExpense =
   }
 
 
+
+const getRecentExpenses =
+  async (req, res, next) => {
+    try {
+
+      const expenses =
+        await expenseModel
+          .find({
+            userId: req.user.id,
+          })
+          .populate(
+            "categoryId",
+            "name icon color"
+          )
+          .sort({
+            createdAt: -1,
+          })
+          .limit(5)
+
+      return res.status(200).json({
+        success: true,
+        expenses,
+      })
+
+    } catch (error) {
+      next(error);
+    }
+  }
+
+
+
+const searchExpenses =
+  async (req, res, next) => {
+    try {
+
+      const { q } = req.query
+
+      const expenses =
+        await expenseModel
+          .find({
+            userId: req.user.id,
+
+            $or: [
+              {
+                title: {
+                  $regex: q,
+                  $options: "i",
+                },
+              },
+
+              {
+                notes: {
+                  $regex: q,
+                  $options: "i",
+                },
+              },
+
+              {
+                merchant: {
+                  $regex: q,
+                  $options: "i",
+                },
+              },
+            ],
+          })
+          .populate(
+            "categoryId",
+            "name icon color"
+          )
+
+      return res.status(200).json({
+        success: true,
+        count: expenses.length,
+        expenses,
+      });
+
+    } catch (error) {
+      next(error)
+    }
+  }
+
+
+
+
+const duplicateExpense =
+  async (req, res, next) => {
+    try {
+
+      const expense =
+        await expenseModel.findOne({
+          _id: req.params.id,
+          userId: req.user.id,
+        })
+
+      if (!expense) {
+        return res.status(404).json({
+          success: false,
+          message:
+            "Expense not found",
+        })
+      }
+
+      const duplicatedExpense =
+        await expenseModel.create({
+          userId: expense.userId,
+
+          title: expense.title,
+
+          amount: expense.amount,
+
+          categoryId:
+            expense.categoryId,
+
+          merchant:
+            expense.merchant,
+
+          paymentMethod:
+            expense.paymentMethod,
+
+          notes: expense.notes,
+
+          tags: expense.tags,
+
+          source: expense.source,
+
+          expenseDate:
+            new Date(),
+
+          favorite: false,
+        })
+
+      return res.status(201).json({
+        success: true,
+        message:
+          "Expense duplicated successfully",
+
+        duplicatedExpense,
+      })
+
+    } catch (error) {
+      next(error)
+    }
+  }
+
+
+
 export {
   createExpense,
   getExpenses,
@@ -268,4 +571,7 @@ export {
   updateExpense,
   deleteExpense,
   toggleFavoriteExpense,
+  getRecentExpenses,
+  searchExpenses,
+  duplicateExpense,
 }
