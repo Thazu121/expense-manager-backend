@@ -1,245 +1,412 @@
-import fs from "fs";
-import Tesseract from "tesseract.js";
-import sharp from "sharp";
+import cloudinary from "../config/cloudinary.js";
 
 import { receiptModel } from "../models/receiptModel.js";
 import { expenseModel } from "../models/expenseModel.js";
 
-export const uploadReceipt = async (req, res, next) => {
-  let receipt;
+import { ocrQueue } from "../queues/ocrQueue.js";
 
+
+
+export const uploadReceipt = async (
+  req,
+  res,
+  next
+) => {
   try {
     if (!req.file) {
       return res.status(400).json({
         success: false,
-        message: "Receipt image is required",
+        message:
+          "Receipt image is required",
       });
     }
 
-    const imageUrl = `${req.protocol}://${req.get(
-      "host"
-    )}/uploads/receipts/${req.file.filename}`;
+    const receipt =
+      await receiptModel.create({
+        userId: req.user.id,
 
-    // 1. Create receipt (processing state)
-    receipt = await receiptModel.create({
-      userId: req.user.id,
-      imageUrl,
-      fileName: req.file.filename,
-      fileSize: req.file.size,
-      mimeType: req.file.mimetype,
-      ocrStatus: "processing",
-      ocrProvider: "tesseract",
-    });
+        imageUrl:
+          req.file.path,
 
-    // 2. Read image safely
-    const buffer = fs.readFileSync(req.file.path);
+        publicId:
+          req.file.filename,
 
-    // 3. Image preprocessing (IMPORTANT for OCR accuracy)
-    const processedImage = await sharp(buffer)
-      .resize({ width: 1500 })
-      .grayscale()
-      .normalize()
-      .sharpen()
-      .toBuffer();
+        fileSize:
+          req.file.size,
 
-    // 4. OCR processing
-    let text = "";
-    let confidence = 0;
+        mimeType:
+          req.file.mimetype,
 
-    try {
-      const result = await Tesseract.recognize(
-        processedImage,
-        "eng"
-      );
+        ocrStatus:
+          "pending",
 
-      text = result.data.text;
-      confidence = result.data.confidence;
-    } catch (ocrError) {
-      await receiptModel.findByIdAndUpdate(receipt._id, {
-        ocrStatus: "failed",
+        ocrProvider:
+          "tesseract",
       });
 
-      return res.status(500).json({
-        success: false,
-        message: "OCR processing failed",
-      });
-    }
-
-    // 5. Extract structured data
-    const parsed = extractReceiptData(text);
-
-    // 6. Update receipt in DB
-    receipt = await receiptModel.findByIdAndUpdate(
-      receipt._id,
+    await ocrQueue.add(
+      "process-ocr",
       {
-        extractedText: text,
-        confidenceScore: Math.round(confidence),
-        merchantName: parsed.merchant,
-        extractedAmount: parsed.amount,
-        extractedDate: parsed.date,
-        ocrStatus: "completed",
+        receiptId:
+          receipt._id.toString(),
+
+        imageUrl:
+          receipt.imageUrl,
       },
-      { new: true }
+      {
+        attempts: 3,
+
+        backoff: {
+          type: "exponential",
+          delay: 2000,
+        },
+
+        removeOnComplete: 100,
+
+        removeOnFail: 50,
+      }
     );
 
     return res.status(201).json({
       success: true,
-      message: "Receipt uploaded and processed successfully",
-      receipt,
+
+      message:
+        "Receipt uploaded successfully. OCR started.",
+
+      receiptId:
+        receipt._id,
+
+      imageUrl:
+        receipt.imageUrl,
+
+      ocrStatus:
+        receipt.ocrStatus,
     });
   } catch (error) {
-    if (receipt) {
-      await receiptModel.findByIdAndUpdate(receipt._id, {
-        ocrStatus: "failed",
-      });
-    }
-
     next(error);
   }
-}
+};
 
 
 
-function extractReceiptData(text) {
-  const cleanText = text.replace(/\s+/g, " ");
-
-  const lines = text
-    .split("\n")
-    .map((l) => l.trim())
-    .filter(Boolean);
-
-  // Merchant (first readable line)
-  const merchant = lines[0] || "";
-
-  // Date detection
-  const dateMatch = cleanText.match(
-    /\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}/
-  );
-
-  // Amount detection
-  const amountMatch = cleanText
-    .replace(/,/g, "")
-    .match(/\d+\.\d{2}/g);
-
-  const amount = amountMatch
-    ? parseFloat(amountMatch.pop())
-    : null;
-
-  return {
-    merchant,
-    date: dateMatch ? new Date(dateMatch[0]) : null,
-    amount,
-  };
-}
-
-export const getReceipts = async (req, res, next) => {
+export const getReceipts = async (
+  req,
+  res,
+  next
+) => {
   try {
-    const receipts = await receiptModel
-      .find({ userId: req.user.id })
-      .sort({ createdAt: -1 });
+    const receipts =
+      await receiptModel
+        .find({
+          userId: req.user.id,
+        })
+        .sort({
+          createdAt: -1,
+        });
 
-    res.json({
+    return res.status(200).json({
       success: true,
-      count: receipts.length,
+
+      count:
+        receipts.length,
+
       receipts,
     });
   } catch (error) {
     next(error);
   }
-}
+};
 
 
 
-export const getSingleReceipt = async (req, res, next) => {
+export const getSingleReceipt = async (
+  req,
+  res,
+  next
+) => {
   try {
-    const receipt = await receiptModel.findOne({
-      _id: req.params.id,
-      userId: req.user.id,
-    });
+    const receipt =
+      await receiptModel.findOne({
+        _id: req.params.id,
+
+        userId:
+          req.user.id,
+      });
 
     if (!receipt) {
       return res.status(404).json({
         success: false,
-        message: "Receipt not found",
+
+        message:
+          "Receipt not found",
       });
     }
 
-    res.json({
+    return res.status(200).json({
       success: true,
+
       receipt,
     });
   } catch (error) {
     next(error);
   }
-}
+};
 
 
 
-export const deleteReceipt = async (req, res, next) => {
+export const getReceiptStatus = async (
+  req,
+  res,
+  next
+) => {
   try {
-    const receipt = await receiptModel.findOne({
-      _id: req.params.id,
-      userId: req.user.id,
-    });
+    const receipt =
+      await receiptModel.findOne({
+        _id: req.params.id,
+
+        userId:
+          req.user.id,
+      });
 
     if (!receipt) {
       return res.status(404).json({
         success: false,
-        message: "Receipt not found",
+
+        message:
+          "Receipt not found",
       });
     }
 
-    // delete file
-    if (fs.existsSync(req.file?.path)) {
-      fs.unlinkSync(req.file.path);
+    return res.status(200).json({
+      success: true,
+
+      receiptId:
+        receipt._id,
+
+      status:
+        receipt.ocrStatus,
+
+      confidence:
+        receipt.ocrConfidence,
+
+      extractedData:
+        receipt.extractedData,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+
+export const getReceiptResult = async (
+  req,
+  res,
+  next
+) => {
+  try {
+    const receipt =
+      await receiptModel.findOne({
+        _id: req.params.id,
+
+        userId:
+          req.user.id,
+      });
+
+    if (!receipt) {
+      return res.status(404).json({
+        success: false,
+
+        message:
+          "Receipt not found",
+      });
+    }
+
+    if (
+      receipt.ocrStatus !==
+      "completed"
+    ) {
+      return res.status(200).json({
+        success: true,
+
+        completed: false,
+
+        status:
+          receipt.ocrStatus,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+
+      completed: true,
+
+      confidence:
+        receipt.ocrConfidence,
+
+      extractedData:
+        receipt.extractedData,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+
+export const verifyReceipt = async (
+  req,
+  res,
+  next
+) => {
+  try {
+    const receipt =
+      await receiptModel.findOne({
+        _id: req.params.id,
+
+        userId:
+          req.user.id,
+      });
+
+    if (!receipt) {
+      return res.status(404).json({
+        success: false,
+
+        message:
+          "Receipt not found",
+      });
+    }
+
+    receipt.ocrStatus =
+      "verified";
+
+    await receipt.save();
+
+    return res.status(200).json({
+      success: true,
+
+      message:
+        "Receipt verified successfully",
+
+      receipt,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+
+export const linkReceiptToExpense = async (
+  req,
+  res,
+  next
+) => {
+  try {
+    const {
+      expenseId,
+    } = req.body;
+
+    const receipt =
+      await receiptModel.findOne({
+        _id: req.params.id,
+
+        userId:
+          req.user.id,
+      });
+
+    const expense =
+      await expenseModel.findOne({
+        _id: expenseId,
+
+        userId:
+          req.user.id,
+      });
+
+    if (
+      !receipt ||
+      !expense
+    ) {
+      return res.status(404).json({
+        success: false,
+
+        message:
+          "Receipt or Expense not found",
+      });
+    }
+
+    receipt.expenseId =
+      expense._id;
+
+    await receipt.save();
+
+    expense.receiptImage =
+      receipt.imageUrl;
+
+    await expense.save();
+
+    return res.status(200).json({
+      success: true,
+
+      message:
+        "Receipt linked successfully",
+
+      receipt,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+
+export const deleteReceipt = async (
+  req,
+  res,
+  next
+) => {
+  try {
+    const receipt =
+      await receiptModel.findOne({
+        _id: req.params.id,
+
+        userId:
+          req.user.id,
+      });
+
+    if (!receipt) {
+      return res.status(404).json({
+        success: false,
+
+        message:
+          "Receipt not found",
+      });
+    }
+
+    if (
+      receipt.publicId
+    ) {
+      try {
+        await cloudinary.uploader.destroy(
+          receipt.publicId
+        );
+      } catch (err) {
+        console.error(
+          "Cloudinary delete failed:",
+          err.message
+        );
+      }
     }
 
     await receipt.deleteOne();
 
-    res.json({
+    return res.status(200).json({
       success: true,
-      message: "Receipt deleted",
+
+      message:
+        "Receipt deleted successfully",
     });
   } catch (error) {
     next(error);
   }
-}
-
-
-export const linkReceiptToExpense = async (req, res, next) => {
-  try {
-    const { expenseId } = req.body;
-
-    const receipt = await receiptModel.findOne({
-      _id: req.params.id,
-      userId: req.user.id,
-    });
-
-    const expense = await expenseModel.findOne({
-      _id: expenseId,
-      userId: req.user.id,
-    });
-
-    if (!receipt || !expense) {
-      return res.status(404).json({
-        success: false,
-        message: "Receipt or Expense not found",
-      });
-    }
-
-    receipt.expenseId = expense._id;
-    await receipt.save();
-
-    expense.receiptImage = receipt.imageUrl;
-    await expense.save();
-
-    res.json({
-      success: true,
-      message: "Receipt linked successfully",
-      receipt,
-    });
-  } catch (error) {
-    next(error);
-  }
-}
-
+};

@@ -15,12 +15,14 @@
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
+    "bullmq": "^5.77.6",
     "cloudinary": "^1.41.3",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "express-rate-limit": "^8.5.2",
     "helmet": "^8.2.0",
+    "ioredis": "^5.11.0",
     "joi": "^18.2.1",
     "json2csv": "^6.0.0-alpha.2",
     "jsonwebtoken": "^9.0.3",
@@ -31,6 +33,7 @@
     "node-cron": "^4.2.1",
     "pdfkit": "^0.18.0",
     "sharp": "^0.34.5",
+    "socket.io": "^4.8.3",
     "tesseract.js": "^7.0.0"
   }
 }
