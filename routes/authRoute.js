@@ -4,17 +4,22 @@ import {
   registerUser,
   loginUser,
   getProfile,
+  // updateProfile,
+  // changePassword,
+  // logoutUser,
 } from "../controllers/authController.js";
 
-const authRoute = express.Router()
+const authRoute = express.Router();
 
-authRoute.post("/register", registerUser)
+authRoute.post("/register", registerUser);
 
-authRoute.post("/login", loginUser)
+authRoute.post("/login", loginUser);
 
-authRoute.get("/profile",getProfile)
-authRoute.put("/profile",)
-authRoute.put("/change-password")
-authRoute.post("/logout")
+authRoute.get("/profile", getProfile);
+// authRoute.put("/profile", updateProfile);
 
-export default authRoute
+// authRoute.put("/change-password", changePassword);
+
+// authRoute.post("/logout", logoutUser);
+
+export default authRoute;
