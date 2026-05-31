@@ -2,31 +2,29 @@ import { userModel } from "../models/userModel.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
+
 const registerUser = async (req, res, next) => {
   try {
-    let { name, email, password } = req.body
+    let { name, email, password } = req.body;
 
-    name = name.trim()
-    email=email.trim()
+    name = name?.trim();
+    email = email?.trim();
 
     if (!name || !email || !password) {
       return res.status(400).json({
         success: false,
         message: "All fields are required",
-      })
+      });
     }
 
     if (name.length < 3) {
       return res.status(400).json({
         success: false,
-        message:
-          "Name must contain at least 3 characters",
+        message: "Name must be at least 3 characters",
       });
     }
 
-    const emailRegex =
-      /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       return res.status(400).json({
         success: false,
@@ -45,8 +43,7 @@ const registerUser = async (req, res, next) => {
       });
     }
 
-    const existingUser =
-      await userModel.findOne({ email });
+    const existingUser = await userModel.findOne({ email });
 
     if (existingUser) {
       return res.status(409).json({
@@ -55,21 +52,24 @@ const registerUser = async (req, res, next) => {
       });
     }
 
-    const hashedPassword =
-      await bcrypt.hash(password, 10);
+    const hashedPassword = await bcrypt.hash(password, 10);
 
     const user = await userModel.create({
       name,
       email,
       password: hashedPassword,
-    })
+    });
 
-  
+    const token = jwt.sign(
+      { id: user._id },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       message: "User registered successfully",
-
+      token,
       user: {
         id: user._id,
         name: user.name,
@@ -80,13 +80,10 @@ const registerUser = async (req, res, next) => {
         currency: user.currency,
       },
     });
-
   } catch (error) {
-        next(error)
-
+    next(error);
   }
-}
-
+};
 
 
 const loginUser = async (req, res, next) => {
@@ -124,16 +121,13 @@ const loginUser = async (req, res, next) => {
     const token = jwt.sign(
       { id: user._id },
       process.env.JWT_SECRET,
-      {
-        expiresIn: "7d",
-      }
+      { expiresIn: "7d" }
     );
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       message: "Login successful",
       token,
-
       user: {
         id: user._id,
         name: user.name,
@@ -144,17 +138,13 @@ const loginUser = async (req, res, next) => {
         currency: user.currency,
       },
     });
-
   } catch (error) {
- next(error)
+    next(error);
   }
-}
+};
 
-const getProfile = async (
-  req,
-  res,
-  next
-) => {
+
+const getProfile = async (req, res, next) => {
   try {
     const user = await userModel
       .findById(req.user.id)
@@ -164,27 +154,124 @@ const getProfile = async (
       return res.status(404).json({
         success: false,
         message: "User not found",
-      })
+      });
     }
 
     return res.status(200).json({
       success: true,
-      message: "Profile fetched successfully",
       user,
-    })
+    });
   } catch (error) {
     next(error);
   }
-}
-const updateProfile=async (req,res,next) => {
+};
+
+
+const updateUsername = async (req, res, next) => {
   try {
-    
+    const { name } = req.body;
+
+    if (!name || name.trim().length < 3) {
+      return res.status(400).json({
+        success: false,
+        message: "Name must be at least 3 characters",
+      });
+    }
+
+    const user = await userModel.findByIdAndUpdate(
+      req.user.id,
+      { name: name.trim() },
+      { new: true }
+    ).select("-password");
+
+    return res.status(200).json({
+      success: true,
+      message: "Username updated",
+      user,
+    });
   } catch (error) {
-    next(error)
+    next(error);
   }
-}
-export { 
-  registerUser
-  ,loginUser,
-  getProfile
- }
+};
+
+
+const changePassword = async (req, res, next) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    const user = await userModel.findById(req.user.id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    const isMatch = await bcrypt.compare(
+      currentPassword,
+      user.password
+    );
+
+    if (!isMatch) {
+      return res.status(400).json({
+        success: false,
+        message: "Current password is wrong",
+      });
+    }
+
+    user.password = await bcrypt.hash(newPassword, 10);
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Password updated successfully",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+const deleteAccount = async (req, res, next) => {
+  try {
+    await userModel.findByIdAndDelete(req.user.id);
+
+    return res.status(200).json({
+      success: true,
+      message: "Account deleted successfully",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+const updateProfilePhoto = async (req, res, next) => {
+  try {
+    const user = await userModel.findByIdAndUpdate(
+      req.user.id,
+      { profileImage: req.file.path },
+      { new: true }
+    ).select("-password");
+
+    return res.status(200).json({
+      success: true,
+      message: "Profile photo updated",
+      user,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+export {
+  registerUser,
+  loginUser,
+  getProfile,
+  updateUsername,
+  changePassword,
+  deleteAccount,
+  updateProfilePhoto,
+};

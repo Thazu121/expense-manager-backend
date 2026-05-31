@@ -1,5 +1,5 @@
 import { expenseModel } from "../models/expenseModel.js";
-
+import { sendNotification } from "../utils/sendNotification.js";
 
 
 const createExpense = async (
@@ -50,6 +50,13 @@ const createExpense = async (
         isRecurring,
         recurringType,
       })
+
+      await sendNotification({
+      userId: req.user.id,
+      title: "Expense Added",
+      message: `${title} - ₹${amount} added successfully`,
+    });
+
 
     return res.status(201).json({
       success: true,
@@ -331,6 +338,11 @@ const updateExpense = async (
       expense.recurringType
 
     await expense.save()
+        await sendNotification({
+      userId: req.user.id,
+      title: "Expense Updated",
+      message: `${expense.title} updated successfully`,
+    });
 
     return res.status(200).json({
       success: true,
@@ -367,7 +379,13 @@ const deleteExpense = async (
       })
     }
 
-    await expense.deleteOne();
+    await expense.deleteOne()
+
+        await sendNotification({
+      userId: req.user.id,
+      title: "Expense Deleted",
+      message: `${expense.title} removed successfully`,
+    });
 
     return res.status(200).json({
       success: true,
@@ -404,7 +422,13 @@ const toggleFavoriteExpense =
         !expense.favorite
 
       await expense.save()
-
+    await sendNotification({
+      userId: req.user.id,
+      title: "Favorite Updated",
+      message: `${expense.title} marked as ${
+        expense.favorite ? "favorite ❤️" : "removed"
+      }`,
+    });
       return res.status(200).json({
         success: true,
         message:

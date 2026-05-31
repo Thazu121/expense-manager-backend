@@ -2,12 +2,12 @@ import express from "express";
 import { upload } from "../middlewares/uploadMiddleware.js";
 import { scanReceiptController } from "../controllers/scanController.js";
 
-const Scanrouter = express.Router();
+const scanRouter = express.Router();
 
-Scanrouter.post(
+scanRouter.post(
   "/receipt",
   upload.single("receipt"),
   scanReceiptController
 );
 
-export default Scanrouter;
+export default scanRouter;

@@ -4,22 +4,29 @@ import {
   registerUser,
   loginUser,
   getProfile,
-  // updateProfile,
-  // changePassword,
-  // logoutUser,
+  updateUsername,
+  changePassword,
+  deleteAccount,
+  updateProfilePhoto,
 } from "../controllers/authController.js";
+
+import authMiddleware from "../middlewares/authMiddleware.js";
 
 const authRoute = express.Router();
 
-authRoute.post("/register", registerUser);
 
+authRoute.post("/register", registerUser);
 authRoute.post("/login", loginUser);
 
-authRoute.get("/profile", getProfile);
-// authRoute.put("/profile", updateProfile);
 
-// authRoute.put("/change-password", changePassword);
+authRoute.get("/profile", authMiddleware, getProfile)
 
-// authRoute.post("/logout", logoutUser);
+authRoute.put("/profile", authMiddleware, updateUsername)
 
-export default authRoute;
+authRoute.put("/change-password", authMiddleware, changePassword)
+
+authRoute.put("/profile-photo", authMiddleware, updateProfilePhoto)
+
+authRoute.delete("/delete-account", authMiddleware, deleteAccount)
+
+export default authRoute
