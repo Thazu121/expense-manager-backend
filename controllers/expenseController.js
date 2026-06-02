@@ -35,27 +35,26 @@ const createExpense = async (
       })
     }
 
-    const expense =
-      await expenseModel.create({
-        userId: req.user.id,
-        title,
-        amount,
-        categoryId,
-        merchant,
-        paymentMethod,
-        notes,
-        tags,
-        source,
-        expenseDate,
-        isRecurring,
-        recurringType,
-      })
+const expense = await expenseModel.create({
+  userId: req.user.id,
+  title,
+  amount,
+  categoryId,
+  merchant,
+  paymentMethod,
+  notes,
+  tags,
+  source,
+  expenseDate,
+  isRecurring,
+  recurringType,
+});
 
-      await sendNotification({
-      userId: req.user.id,
-      title: "Expense Added",
-      message: `${title} - ₹${amount} added successfully`,
-    });
+sendNotification({
+  userId: req.user.id,
+  title: "Expense Added",
+  message: `${title} - ₹${amount} added successfully`,
+});
 
 
     return res.status(201).json({
@@ -298,6 +297,7 @@ const updateExpense = async (
           "Expense not found",
       })
     }
+    const oldTitle = expense.title;
 
     expense.title =
       title || expense.title
@@ -336,13 +336,11 @@ const updateExpense = async (
     expense.recurringType =
       recurringType ||
       expense.recurringType
-
-    await expense.save()
-        await sendNotification({
-      userId: req.user.id,
-      title: "Expense Updated",
-      message: `${expense.title} updated successfully`,
-    });
+sendNotification({
+  userId: req.user.id,
+  title: "Expense Updated",
+  message: `${oldTitle} updated successfully`,
+});
 
     return res.status(200).json({
       success: true,
@@ -379,13 +377,15 @@ const deleteExpense = async (
       })
     }
 
-    await expense.deleteOne()
+const deletedTitle = expense.title;
 
-        await sendNotification({
-      userId: req.user.id,
-      title: "Expense Deleted",
-      message: `${expense.title} removed successfully`,
-    });
+await expense.deleteOne();
+
+sendNotification({
+  userId: req.user.id,
+  title: "Expense Deleted",
+  message: `${deletedTitle} removed successfully`,
+})
 
     return res.status(200).json({
       success: true,
@@ -421,14 +421,16 @@ const toggleFavoriteExpense =
       expense.favorite =
         !expense.favorite
 
-      await expense.save()
-    await sendNotification({
-      userId: req.user.id,
-      title: "Favorite Updated",
-      message: `${expense.title} marked as ${
-        expense.favorite ? "favorite ❤️" : "removed"
-      }`,
-    });
+
+await expense.save()
+
+sendNotification({
+  userId: req.user.id,
+  title: "Favorite Updated",
+  message: `${expense.title} marked as ${
+    expense.favorite ? "favorite ❤️" : "removed"
+  }`,
+})
       return res.status(200).json({
         success: true,
         message:

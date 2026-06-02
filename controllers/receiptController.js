@@ -3,7 +3,8 @@ import cloudinary from "../config/cloudinary.js";
 import { receiptModel } from "../models/receiptModel.js";
 import { expenseModel } from "../models/expenseModel.js";
 
-import { ocrQueue } from "../queues/ocrQueue.js";
+
+
 
 
 
@@ -16,77 +17,35 @@ export const uploadReceipt = async (
     if (!req.file) {
       return res.status(400).json({
         success: false,
-        message:
-          "Receipt image is required",
+        message: "Receipt image is required",
       });
     }
 
-    const receipt =
-      await receiptModel.create({
-        userId: req.user.id,
+    const receipt = await receiptModel.create({
+      userId: req.user.id,
 
-        imageUrl:
-          req.file.path,
+      imageUrl: req.file.path,
 
-        publicId:
-          req.file.filename,
+      publicId: req.file.filename,
 
-        fileSize:
-          req.file.size,
+      fileSize: req.file.size,
 
-        mimeType:
-          req.file.mimetype,
+      mimeType: req.file.mimetype,
 
-        ocrStatus:
-          "pending",
-
-        ocrProvider:
-          "tesseract",
-      });
-
-    await ocrQueue.add(
-      "process-ocr",
-      {
-        receiptId:
-          receipt._id.toString(),
-
-        imageUrl:
-          receipt.imageUrl,
-      },
-      {
-        attempts: 3,
-
-        backoff: {
-          type: "exponential",
-          delay: 2000,
-        },
-
-        removeOnComplete: 100,
-
-        removeOnFail: 50,
-      }
-    );
+      ocrStatus: "uploaded",
+    });
 
     return res.status(201).json({
       success: true,
 
-      message:
-        "Receipt uploaded successfully. OCR started.",
+      message: "Receipt uploaded successfully",
 
-      receiptId:
-        receipt._id,
-
-      imageUrl:
-        receipt.imageUrl,
-
-      ocrStatus:
-        receipt.ocrStatus,
+      receipt,
     });
   } catch (error) {
     next(error);
   }
 };
-
 
 
 export const getReceipts = async (

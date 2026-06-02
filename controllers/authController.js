@@ -2,163 +2,117 @@ import { userModel } from "../models/userModel.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
-
-const registerUser = async (req, res, next) => {
+export const registerUser = async (
+  req,
+  res,
+  next
+) => {
   try {
-    let { name, email, password } = req.body;
+    const {
+      name,
+      email,
+      password,
+    } = req.body;
 
-    name = name?.trim();
-    email = email?.trim();
-
-    if (!name || !email || !password) {
-      return res.status(400).json({
-        success: false,
-        message: "All fields are required",
+    const existingUser =
+      await userModel.findOne({
+        email,
       });
-    }
 
-    if (name.length < 3) {
-      return res.status(400).json({
-        success: false,
-        message: "Name must be at least 3 characters",
-      });
-    }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid email",
-      });
-    }
-
-    const passwordRegex =
-      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{6,}$/;
-
-    if (!passwordRegex.test(password)) {
+    if (existingUser) {
       return res.status(400).json({
         success: false,
         message:
-          "Password must contain uppercase, lowercase and number",
+          "User already exists",
       });
     }
 
-    const existingUser = await userModel.findOne({ email });
+    const hashedPassword =
+      await bcrypt.hash(
+        password,
+        10
+      );
 
-    if (existingUser) {
-      return res.status(409).json({
-        success: false,
-        message: "User already exists",
+    const user =
+      await userModel.create({
+        name,
+        email,
+        password:
+          hashedPassword,
       });
-    }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const token = jwt.sign(
+      { id: user._id },
+      process.env.JWT_SECRET,
+      {
+        expiresIn: "7d",
+      }
+    );
 
-    const user = await userModel.create({
-      name,
+    res.status(201).json({
+      success: true,
+      message:
+        "Registered successfully",
+      token,
+      user,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// LOGIN
+export const loginUser = async (
+  req,
+  res,
+  next
+) => {
+  try {
+    const {
       email,
-      password: hashedPassword,
-    });
-
-    const token = jwt.sign(
-      { id: user._id },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
-
-    return res.status(201).json({
-      success: true,
-      message: "User registered successfully",
-      token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        profileImage: user.profileImage,
-        darkMode: user.darkMode,
-        currency: user.currency,
-      },
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-
-const loginUser = async (req, res, next) => {
-  try {
-    const { email, password } = req.body;
-
-    if (!email || !password) {
-      return res.status(400).json({
-        success: false,
-        message: "Email and password are required",
-      });
-    }
-
-    const user = await userModel.findOne({ email });
-
-    if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid email or password",
-      });
-    }
-
-    const isMatch = await bcrypt.compare(
       password,
-      user.password
-    );
+    } = req.body;
 
-    if (!isMatch) {
+    const user =
+      await userModel.findOne({
+        email,
+      });
+
+    if (!user) {
       return res.status(401).json({
         success: false,
-        message: "Invalid email or password",
+        message:
+          "Invalid credentials",
+      });
+    }
+
+    const match =
+      await bcrypt.compare(
+        password,
+        user.password
+      );
+
+    if (!match) {
+      return res.status(401).json({
+        success: false,
+        message:
+          "Invalid credentials",
       });
     }
 
     const token = jwt.sign(
       { id: user._id },
       process.env.JWT_SECRET,
-      { expiresIn: "7d" }
+      {
+        expiresIn: "7d",
+      }
     );
 
-    return res.status(200).json({
+    res.status(200).json({
       success: true,
-      message: "Login successful",
+      message:
+        "Login successful",
       token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        profileImage: user.profileImage,
-        darkMode: user.darkMode,
-        currency: user.currency,
-      },
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-
-const getProfile = async (req, res, next) => {
-  try {
-    const user = await userModel
-      .findById(req.user.id)
-      .select("-password");
-
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found",
-      });
-    }
-
-    return res.status(200).json({
-      success: true,
       user,
     });
   } catch (error) {
@@ -166,112 +120,287 @@ const getProfile = async (req, res, next) => {
   }
 };
 
+// PROFILE
+export const getProfile =
+  async (
+    req,
+    res,
+    next
+  ) => {
+    try {
+      const user =
+        await userModel
+          .findById(
+            req.user.id
+          )
+          .select(
+            "-password"
+          );
 
-const updateUsername = async (req, res, next) => {
-  try {
-    const { name } = req.body;
-
-    if (!name || name.trim().length < 3) {
-      return res.status(400).json({
-        success: false,
-        message: "Name must be at least 3 characters",
+      res.status(200).json({
+        success: true,
+        user,
       });
+    } catch (error) {
+      next(error);
     }
+  };
 
-    const user = await userModel.findByIdAndUpdate(
-      req.user.id,
-      { name: name.trim() },
-      { new: true }
-    ).select("-password");
+// UPDATE USERNAME
+export const updateUsername =
+  async (
+    req,
+    res,
+    next
+  ) => {
+    try {
+      const { name } =
+        req.body;
 
-    return res.status(200).json({
-      success: true,
-      message: "Username updated",
-      user,
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+      const user =
+        await userModel
+          .findByIdAndUpdate(
+            req.user.id,
+            { name },
+            { new: true }
+          )
+          .select(
+            "-password"
+          );
 
-
-const changePassword = async (req, res, next) => {
-  try {
-    const { currentPassword, newPassword } = req.body;
-
-    const user = await userModel.findById(req.user.id);
-
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found",
+      res.status(200).json({
+        success: true,
+        message:
+          "Username updated",
+        user,
       });
+    } catch (error) {
+      next(error);
     }
+  };
 
-    const isMatch = await bcrypt.compare(
-      currentPassword,
-      user.password
-    );
+// CHANGE PASSWORD
+export const changePassword =
+  async (
+    req,
+    res,
+    next
+  ) => {
+    try {
+      const {
+        currentPassword,
+        newPassword,
+      } = req.body;
 
-    if (!isMatch) {
-      return res.status(400).json({
-        success: false,
-        message: "Current password is wrong",
+      const user =
+        await userModel.findById(
+          req.user.id
+        );
+
+      const match =
+        await bcrypt.compare(
+          currentPassword,
+          user.password
+        );
+
+      if (!match) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Current password incorrect",
+        });
+      }
+
+      user.password =
+        await bcrypt.hash(
+          newPassword,
+          10
+        );
+
+      await user.save();
+
+      res.status(200).json({
+        success: true,
+        message:
+          "Password changed successfully",
       });
+    } catch (error) {
+      next(error);
     }
+  };
 
-    user.password = await bcrypt.hash(newPassword, 10);
-    await user.save();
+// FORGOT PASSWORD
+export const forgotPassword =
+  async (
+    req,
+    res,
+    next
+  ) => {
+    try {
+      const { email } =
+        req.body;
 
-    return res.status(200).json({
-      success: true,
-      message: "Password updated successfully",
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+      const user =
+        await userModel.findOne({
+          email,
+        });
 
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message:
+            "User not found",
+        });
+      }
 
-const deleteAccount = async (req, res, next) => {
-  try {
-    await userModel.findByIdAndDelete(req.user.id);
+      const otp =
+        Math.floor(
+          100000 +
+            Math.random() *
+              900000
+        ).toString();
 
-    return res.status(200).json({
-      success: true,
-      message: "Account deleted successfully",
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+      user.resetCode =
+        otp;
 
+      user.resetCodeExpire =
+        Date.now() +
+        10 * 60 * 1000;
 
-const updateProfilePhoto = async (req, res, next) => {
-  try {
-    const user = await userModel.findByIdAndUpdate(
-      req.user.id,
-      { profileImage: req.file.path },
-      { new: true }
-    ).select("-password");
+      await user.save();
 
-    return res.status(200).json({
-      success: true,
-      message: "Profile photo updated",
-      user,
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+      console.log(
+        "Password Reset OTP:",
+        otp
+      );
 
+      res.status(200).json({
+        success: true,
+        message:
+          "OTP sent successfully",
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
 
-export {
-  registerUser,
-  loginUser,
-  getProfile,
-  updateUsername,
-  changePassword,
-  deleteAccount,
-  updateProfilePhoto,
-};
+// RESET PASSWORD
+export const resetPassword =
+  async (
+    req,
+    res,
+    next
+  ) => {
+    try {
+      const {
+        email,
+        code,
+        newPassword,
+      } = req.body;
+
+      const user =
+        await userModel.findOne({
+          email,
+        });
+
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message:
+            "User not found",
+        });
+      }
+
+      if (
+        user.resetCode !==
+          code ||
+        user.resetCodeExpire <
+          Date.now()
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Invalid or expired OTP",
+        });
+      }
+
+      user.password =
+        await bcrypt.hash(
+          newPassword,
+          10
+        );
+
+      user.resetCode =
+        undefined;
+
+      user.resetCodeExpire =
+        undefined;
+
+      await user.save();
+
+      res.status(200).json({
+        success: true,
+        message:
+          "Password reset successfully",
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+// DELETE ACCOUNT
+export const deleteAccount =
+  async (
+    req,
+    res,
+    next
+  ) => {
+    try {
+      await userModel.findByIdAndDelete(
+        req.user.id
+      );
+
+      res.status(200).json({
+        success: true,
+        message:
+          "Account deleted successfully",
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+// PROFILE PHOTO
+export const updateProfilePhoto =
+  async (
+    req,
+    res,
+    next
+  ) => {
+    try {
+      const user =
+        await userModel
+          .findByIdAndUpdate(
+            req.user.id,
+            {
+              profileImage:
+                req.file.path,
+            },
+            {
+              new: true,
+            }
+          )
+          .select(
+            "-password"
+          );
+
+      res.status(200).json({
+        success: true,
+        message:
+          "Profile updated",
+        user,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
