@@ -4,39 +4,74 @@ export const parseReceipt = (text) => {
     .map((l) => l.trim())
     .filter(Boolean);
 
-  // ---------------- MERCHANT ----------------
   const merchant =
-    lines.find((l) => l.length > 3 && !/\d/.test(l)) ||
-    "Unknown Merchant";
+    lines.find(
+      (l) =>
+        l.length > 3 &&
+        !/\d/.test(l) &&
+        l === l.toUpperCase()
+    ) || lines[0] || "Unknown Merchant";
 
-  // ---------------- AMOUNT ----------------
-  const amounts = text.match(/\d+[.,]?\d{0,2}/g) || [];
-  const numbers = amounts.map((n) => parseFloat(n.replace(",", "")));
+  let amount = 0;
 
-  const amount = numbers.length ? Math.max(...numbers) : 0;
+  const totalMatch =
+    text.match(/total[:\s]*\$?\s*(\d+\.\d{2})/i) ||
+    text.match(/amount[:\s]*\$?\s*(\d+\.\d{2})/i);
 
-  // ---------------- DATE ----------------
+  if (totalMatch) {
+    amount = parseFloat(totalMatch[1]);
+  } else {
+    const amounts = text.match(/\d+\.\d{2}/g) || [];
+    const numbers = amounts.map(Number);
+    amount = numbers.length ? Math.max(...numbers) : 0;
+  }
+
+  // ---------------- DATE (FIXED) ----------------
   const dateMatch = text.match(
     /\b\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}\b/
   );
 
-  const date = dateMatch ? dateMatch[0] : "";
+  let date = null;
+
+  if (dateMatch) {
+    const raw = dateMatch[0];
+
+    // convert DD/MM/YYYY or DD-MM-YYYY → YYYY-MM-DD
+    const parts = raw.split(/[\/.-]/);
+
+    if (parts.length === 3) {
+      let [d, m, y] = parts;
+
+      // fix 2-digit year
+      if (y.length === 2) {
+        y = "20" + y;
+      }
+
+      date = new Date(`${y}-${m}-${d}`);
+    }
+  }
 
   // ---------------- CATEGORY ----------------
   const lower = text.toLowerCase();
 
   let category = "General";
 
-  if (/fuel|petrol|diesel/.test(lower)) category = "Fuel";
-  else if (/restaurant|cafe|pizza|burger/.test(lower)) category = "Food";
-  else if (/pharmacy|medical/.test(lower)) category = "Medical";
-  else if (/supermarket|grocery|mart/.test(lower)) category = "Grocery";
-  else if (/amazon|flipkart/.test(lower)) category = "Shopping";
+  if (/fuel|petrol|diesel/.test(lower)) {
+    category = "Fuel";
+  } else if (/restaurant|cafe|pizza|burger|food|taco/.test(lower)) {
+    category = "Food";
+  } else if (/pharmacy|medical|hospital/.test(lower)) {
+    category = "Medical";
+  } else if (/supermarket|grocery|mart/.test(lower)) {
+    category = "Grocery";
+  } else if (/amazon|flipkart/.test(lower)) {
+    category = "Shopping";
+  }
 
   return {
     merchant,
     amount,
-    date,
+    date, // ✅ NOW THIS IS A REAL DATE OBJECT
     category,
   };
 };

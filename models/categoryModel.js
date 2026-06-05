@@ -1,33 +1,33 @@
-import mongoose from "mongoose";
+// import mongoose from "mongoose";
 
-const categorySchema = new mongoose.Schema(
-  {
-    userId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "user",
-      required: true,
-    },
+// const categorySchema = new mongoose.Schema(
+//   {
+//     userId: {
+//       type: mongoose.Schema.Types.ObjectId,
+//       ref: "user",
+//       required: true,
+//     },
 
-    name: {
-      type: String,
-      required: true,
-      trim: true,
-    },
+//     name: {
+//       type: String,
+//       required: true,
+//       trim: true,
+//     },
 
-    icon: {
-      type: String,
-      default: "📁",
-    },
+//     icon: {
+//       type: String,
+//       default: "📁",
+//     },
 
-    color: {
-      type: String,
-      default: "#6366f1",
-    },
-  },
-  { timestamps: true }
-)
+//     color: {
+//       type: String,
+//       default: "#6366f1",
+//     },
+//   },
+//   { timestamps: true }
+// )
 
-export const categoryModel = mongoose.model(
-  "category",
-  categorySchema
-)
+// export const categoryModel = mongoose.model(
+//   "category",
+//   categorySchema
+// )

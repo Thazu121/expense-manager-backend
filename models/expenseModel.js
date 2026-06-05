@@ -9,12 +9,14 @@ const expenseSchema = new mongoose.Schema(
       required: true,
     },
 
+receiptId: {
+  type: mongoose.Schema.Types.ObjectId,
+  ref: "receipt",
+},
 
-
-    categoryId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "category",
-      required: true,
+    category: {
+      type: String,
+      default:"General"
     },
 
 
@@ -62,6 +64,7 @@ const expenseSchema = new mongoose.Schema(
       maxlength: 500,
       trim: true,
     },
+    
 
 
 
@@ -140,7 +143,7 @@ expenseSchema.index({
 
 
 expenseSchema.index({
-  categoryId: 1,
+  category: 1,
 })
 
 

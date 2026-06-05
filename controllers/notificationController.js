@@ -8,7 +8,6 @@ export const getNotifications = async (req, res) => {
   res.json({ success: true, notifications });
 };
 
-// MARK ALL READ
 export const markAllRead = async (req, res) => {
   await notificationModel.updateMany(
     { userId: req.user.id },

@@ -4,11 +4,8 @@ import authMiddleware
 from "../middlewares/authMiddleware.js";
 
 import {
-  createCategory,
   getCategories,
   getSingleCategory,
-  updateCategory,
-  deleteCategory,
 } from "../controllers/categoryController.js";
 
 
@@ -17,11 +14,6 @@ const categoryRoute =
 
 
 
-categoryRoute.post(
-  "/",
-  authMiddleware,
-  createCategory
-)
 
 
 
@@ -41,19 +33,10 @@ categoryRoute.get(
 
 
 
-categoryRoute.put(
-  "/:id",
-  authMiddleware,
-  updateCategory
-)
 
 
 
-categoryRoute.delete(
-  "/:id",
-  authMiddleware,
-  deleteCategory
-)
+
 
 
 

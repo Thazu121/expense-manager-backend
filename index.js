@@ -8,12 +8,13 @@ import connectDB from "./config/db.js";
 
 import authRoute from "./routes/authRoute.js";
 import expenseRoute from "./routes/expenseRoute.js";
-import categoryRoute from "./routes/categoryRoute.js";
+// import categoryRoute from "./routes/categoryRoute.js";
 import receiptRoute from "./routes/receiptRoute.js";
 import notificationRoute from "./routes/notificationRoute.js";
 import scanRouter from "./routes/scanRoute.js"
 
 import errorMiddleware from "./middlewares/errorMiddleware.js";
+import "./workers/ocrWorker.js";
 
 dotenv.config();
 
@@ -35,7 +36,7 @@ app.use("/uploads", express.static("uploads"));
 
 app.use("/auth", authRoute);
 app.use("/expenses", expenseRoute);
-app.use("/categories", categoryRoute);
+// app.use("/categories", categoryRoute);
 app.use("/receipts", receiptRoute);
 app.use("/scan",scanRouter)
 app.use("/notification", notificationRoute);

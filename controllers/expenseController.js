@@ -2,17 +2,12 @@ import { expenseModel } from "../models/expenseModel.js";
 import { sendNotification } from "../utils/sendNotification.js";
 
 
-const createExpense = async (
-  req,
-  res,
-  next
-) => {
+const createExpense = async (req, res, next) => {
   try {
-
-    const {
+    let {
       title,
       amount,
-      categoryId,
+      category, 
       merchant,
       paymentMethod,
       notes,
@@ -21,65 +16,92 @@ const createExpense = async (
       expenseDate,
       isRecurring,
       recurringType,
-    } = req.body
+    } = req.body;
 
-    if (
-      !title ||
-      !amount ||
-      !categoryId
-    ) {
+    if (!title || !amount) {
       return res.status(400).json({
         success: false,
-        message:
-          "Title, amount and category are required",
-      })
+        message: "Title and amount are required",
+      });
     }
 
+    const parsedAmount = Number(amount);
+
+  
+    const finalDate = expenseDate ? new Date(expenseDate) : new Date();
+
+    if (isNaN(finalDate.getTime())) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid expense date",
+      });
+    }
+
+    
+    const startOfDay = new Date(finalDate);
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const endOfDay = new Date(finalDate);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const existingExpense = await expenseModel.findOne({
+      userId: req.user.id,
+      title: title.trim(),
+      amount: parsedAmount,
+      expenseDate: {
+        $gte: startOfDay,
+        $lte: endOfDay,
+      },
+    });
+
+    if (existingExpense) {
+      return res.status(409).json({
+        success: false,
+        message: "Duplicate expense detected",
+      });
+    }
+
+    
 const expense = await expenseModel.create({
   userId: req.user.id,
-  title,
-  amount,
-  categoryId,
+  title: title.trim(),
+  amount: parsedAmount,
+  category: category || "General",
   merchant,
   paymentMethod,
   notes,
   tags,
-  source,
-  expenseDate,
+  source: source || "manual",
+  expenseDate: finalDate,
   isRecurring,
   recurringType,
 });
 
-sendNotification({
-  userId: req.user.id,
-  title: "Expense Added",
-  message: `${title} - ₹${amount} added successfully`,
-});
+    try {
+      await sendNotification({
+        userId: req.user.id,
+        title: "Expense Added",
+        message: `${title} - ₹${amount} added successfully`,
+      });
+    } catch (err) {
+      console.log("Notification error:", err.message);
+    }
 
-
+ 
     return res.status(201).json({
       success: true,
-      message:
-        "Expense created successfully",
+      message: "Expense created successfully",
       expense,
-    })
-
+    });
   } catch (error) {
-    next(error)
+    next(error);
   }
-}
+};
 
-
-
-const getExpenses = async (
-  req,
-  res,
-  next
-) => {
+const getExpenses = async (req, res, next) => {
   try {
-
     const {
-      categoryId,
+      category,
       paymentMethod,
       startDate,
       endDate,
@@ -90,190 +112,91 @@ const getExpenses = async (
       favorite,
     } = req.query;
 
-    let filter = {
-      userId: req.user.id,
-    }
+    const pageNum = Math.max(1, Number(page));
+    const limitNum = Math.min(100, Number(limit));
+    const skip = (pageNum - 1) * limitNum;
 
+    let filter = { userId: req.user.id };
 
-    if (categoryId) {
-      filter.categoryId =
-        categoryId
-    }
-
-
-    if (paymentMethod) {
-      filter.paymentMethod =
-        paymentMethod
-    }
-
-
-    if (favorite === "true") {
-      filter.favorite = true;
-    }
-
+    if (category) filter.category= category;
+    if (paymentMethod) filter.paymentMethod = paymentMethod;
+    if (favorite === "true") filter.favorite = true;
 
     if (startDate && endDate) {
       filter.expenseDate = {
         $gte: new Date(startDate),
         $lte: new Date(endDate),
-      }
+      };
     }
 
-
     if (search) {
+      const safeSearch = escapeRegex(search);
+
       filter.$or = [
-        {
-          title: {
-            $regex: search,
-            $options: "i",
-          },
-        },
-
-        {
-          notes: {
-            $regex: search,
-            $options: "i",
-          },
-        },
-
-        {
-          merchant: {
-            $regex: search,
-            $options: "i",
-          },
-        },
+        { title: { $regex: safeSearch, $options: "i" } },
+        { notes: { $regex: safeSearch, $options: "i" } },
+        { merchant: { $regex: safeSearch, $options: "i" } },
       ];
     }
 
+    let sortOption = { createdAt: -1 };
 
+    if (sort === "oldest") sortOption = { createdAt: 1 };
+    if (sort === "highest") sortOption = { amount: -1 };
+    if (sort === "lowest") sortOption = { amount: 1 };
 
-    let sortOption = {
-      createdAt: -1,
-    }
+    const expenses = await expenseModel
+      .find(filter)
+      .sort(sortOption)
+      .skip(skip)
+      .limit(limitNum);
 
-    if (sort === "latest") {
-      sortOption = {
-        createdAt: -1,
-      }
-    }
-
-    if (sort === "oldest") {
-      sortOption = {
-        createdAt: 1,
-      }
-    }
-
-    if (sort === "highest") {
-      sortOption = {
-        amount: -1,
-      }
-    }
-
-    if (sort === "lowest") {
-      sortOption = {
-        amount: 1,
-      }
-    }
-
-
-
-    const skip =
-      (page - 1) * limit;
-
-
-
-    const expenses =
-      await expenseModel
-        .find(filter)
-        .populate(
-          "categoryId",
-          "name icon color"
-        )
-        .sort(sortOption)
-        .skip(skip)
-        .limit(Number(limit));
-
-
-
-    const totalExpenses =
-      await expenseModel.countDocuments(
-        filter
-      )
-
-
+    const totalExpenses = await expenseModel.countDocuments(filter);
 
     return res.status(200).json({
       success: true,
-
-      currentPage: Number(page),
-
-      totalPages: Math.ceil(
-        totalExpenses / limit
-      ),
-
+      currentPage: pageNum,
+      totalPages: Math.ceil(totalExpenses / limitNum),
       totalExpenses,
-
       count: expenses.length,
-
       expenses,
-    })
-
+    });
   } catch (error) {
     next(error);
   }
-}
+};
 
-
-
-const getSingleExpense = async (
-  req,
-  res,
-  next
-) => {
+const getSingleExpense = async (req, res, next) => {
   try {
-
-    const expense =
-      await expenseModel
-        .findOne({
-          _id: req.params.id,
-          userId: req.user.id,
-        })
-        .populate(
-          "categoryId",
-          "name icon color"
-        )
+    const expense = await expenseModel
+      .findOne({
+        _id: req.params.id,
+        userId: req.user.id,
+      })
 
     if (!expense) {
       return res.status(404).json({
         success: false,
-        message:
-          "Expense not found",
-      })
+        message: "Expense not found",
+      });
     }
 
     return res.status(200).json({
       success: true,
       expense,
-    })
-
+    });
   } catch (error) {
-    next(error)
+    next(error);
   }
-}
+};
 
 
-
-const updateExpense = async (
-  req,
-  res,
-  next
-) => {
+const updateExpense = async (req, res, next) => {
   try {
-
     const {
       title,
       amount,
-      categoryId,
+      category,
       merchant,
       paymentMethod,
       notes,
@@ -282,313 +205,215 @@ const updateExpense = async (
       expenseDate,
       isRecurring,
       recurringType,
-    } = req.body
+    } = req.body;
 
-    const expense =
-      await expenseModel.findOne({
-        _id: req.params.id,
-        userId: req.user.id,
-      })
-
-    if (!expense) {
-      return res.status(404).json({
-        success: false,
-        message:
-          "Expense not found",
-      })
-    }
-    const oldTitle = expense.title;
-
-    expense.title =
-      title || expense.title
-
-    expense.amount =
-      amount || expense.amount
-
-    expense.categoryId =
-      categoryId ||
-      expense.categoryId
-
-    expense.merchant =
-      merchant || expense.merchant
-
-    expense.paymentMethod =
-      paymentMethod ||
-      expense.paymentMethod
-
-    expense.notes =
-      notes || expense.notes
-
-    expense.tags =
-      tags || expense.tags
-
-    expense.source =
-      source || expense.source
-
-    expense.expenseDate =
-      expenseDate ||
-      expense.expenseDate
-
-    expense.isRecurring =
-      isRecurring ??
-      expense.isRecurring
-
-    expense.recurringType =
-      recurringType ||
-      expense.recurringType
-sendNotification({
-  userId: req.user.id,
-  title: "Expense Updated",
-  message: `${oldTitle} updated successfully`,
-});
-
-    return res.status(200).json({
-      success: true,
-      message:
-        "Expense updated successfully",
-      expense,
-    })
-
-  } catch (error) {
-    next(error)
-  }
-}
-
-
-
-const deleteExpense = async (
-  req,
-  res,
-  next
-) => {
-  try {
-
-    const expense =
-      await expenseModel.findOne({
-        _id: req.params.id,
-        userId: req.user.id,
-      })
-
-    if (!expense) {
-      return res.status(404).json({
-        success: false,
-        message:
-          "Expense not found",
-      })
-    }
-
-const deletedTitle = expense.title;
-
-await expense.deleteOne();
-
-sendNotification({
-  userId: req.user.id,
-  title: "Expense Deleted",
-  message: `${deletedTitle} removed successfully`,
-})
-
-    return res.status(200).json({
-      success: true,
-      message:
-        "Expense deleted successfully",
+    const expense = await expenseModel.findOne({
+      _id: req.params.id,
+      userId: req.user.id,
     });
 
+    if (!expense) {
+      return res.status(404).json({
+        success: false,
+        message: "Expense not found",
+      });
+    }
+
+    const oldTitle = expense.title;
+
+    if (title !== undefined) expense.title = title;
+    if (amount !== undefined) expense.amount = amount;
+    if (category !== undefined) expense.category = category;
+    if (merchant !== undefined) expense.merchant = merchant;
+    if (paymentMethod !== undefined) expense.paymentMethod = paymentMethod;
+    if (notes !== undefined) expense.notes = notes;
+    if (tags !== undefined) expense.tags = tags;
+    if (source !== undefined) expense.source = source;
+    if (expenseDate !== undefined) expense.expenseDate = expenseDate;
+    if (isRecurring !== undefined) expense.isRecurring = isRecurring;
+    if (recurringType !== undefined) expense.recurringType = recurringType;
+
+    await expense.save();
+
+    try {
+      await sendNotification({
+        userId: req.user.id,
+        title: "Expense Updated",
+        message: `${oldTitle} updated successfully`,
+      });
+    } catch (err) {
+      console.error("Notification error:", err);
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Expense updated successfully",
+      expense,
+    });
   } catch (error) {
     next(error);
   }
-}
+};
 
+const deleteExpense = async (req, res, next) => {
+  try {
+    const expense = await expenseModel.findOne({
+      _id: req.params.id,
+      userId: req.user.id,
+    });
 
-
-const toggleFavoriteExpense =
-  async (req, res, next) => {
-    try {
-
-      const expense =
-        await expenseModel.findOne({
-          _id: req.params.id,
-          userId: req.user.id,
-        })
-
-      if (!expense) {
-        return res.status(404).json({
-          success: false,
-          message:
-            "Expense not found",
-        })
-      }
-
-      expense.favorite =
-        !expense.favorite
-
-
-await expense.save()
-
-sendNotification({
-  userId: req.user.id,
-  title: "Favorite Updated",
-  message: `${expense.title} marked as ${
-    expense.favorite ? "favorite ❤️" : "removed"
-  }`,
-})
-      return res.status(200).json({
-        success: true,
-        message:
-          "Favorite updated successfully",
-        expense,
-      })
-
-    } catch (error) {
-      next(error);
-    }
-  }
-
-
-
-const getRecentExpenses =
-  async (req, res, next) => {
-    try {
-
-      const expenses =
-        await expenseModel
-          .find({
-            userId: req.user.id,
-          })
-          .populate(
-            "categoryId",
-            "name icon color"
-          )
-          .sort({
-            createdAt: -1,
-          })
-          .limit(5)
-
-      return res.status(200).json({
-        success: true,
-        expenses,
-      })
-
-    } catch (error) {
-      next(error);
-    }
-  }
-
-
-
-const searchExpenses =
-  async (req, res, next) => {
-    try {
-
-      const { q } = req.query
-
-      const expenses =
-        await expenseModel
-          .find({
-            userId: req.user.id,
-
-            $or: [
-              {
-                title: {
-                  $regex: q,
-                  $options: "i",
-                },
-              },
-
-              {
-                notes: {
-                  $regex: q,
-                  $options: "i",
-                },
-              },
-
-              {
-                merchant: {
-                  $regex: q,
-                  $options: "i",
-                },
-              },
-            ],
-          })
-          .populate(
-            "categoryId",
-            "name icon color"
-          )
-
-      return res.status(200).json({
-        success: true,
-        count: expenses.length,
-        expenses,
+    if (!expense) {
+      return res.status(404).json({
+        success: false,
+        message: "Expense not found",
       });
-
-    } catch (error) {
-      next(error)
     }
-  }
 
+    const deletedTitle = expense.title;
 
+    await expense.deleteOne();
 
-
-const duplicateExpense =
-  async (req, res, next) => {
     try {
+      await sendNotification({
+        userId: req.user.id,
+        title: "Expense Deleted",
+        message: `${deletedTitle} removed successfully`,
+      });
+    } catch (err) {
+      console.error("Notification error:", err);
+    }
 
-      const expense =
-        await expenseModel.findOne({
-          _id: req.params.id,
-          userId: req.user.id,
-        })
+    return res.status(200).json({
+      success: true,
+      message: "Expense deleted successfully",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
-      if (!expense) {
-        return res.status(404).json({
-          success: false,
-          message:
-            "Expense not found",
-        })
-      }
 
-      const duplicatedExpense =
-        await expenseModel.create({
-          userId: expense.userId,
+const toggleFavoriteExpense = async (req, res, next) => {
+  try {
+    const expense = await expenseModel.findOne({
+      _id: req.params.id,
+      userId: req.user.id,
+    });
 
-          title: expense.title,
+    if (!expense) {
+      return res.status(404).json({
+        success: false,
+        message: "Expense not found",
+      });
+    }
 
-          amount: expense.amount,
+    expense.favorite = !expense.favorite;
+    await expense.save();
 
-          categoryId:
-            expense.categoryId,
+    try {
+      await sendNotification({
+        userId: req.user.id,
+        title: "Favorite Updated",
+        message: `${expense.title} marked as ${
+          expense.favorite ? "favorite ❤️" : "removed"
+        }`,
+      });
+    } catch (err) {
+      console.error("Notification error:", err);
+    }
 
-          merchant:
-            expense.merchant,
+    return res.status(200).json({
+      success: true,
+      message: "Favorite updated successfully",
+      expense,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
-          paymentMethod:
-            expense.paymentMethod,
 
-          notes: expense.notes,
+const getRecentExpenses = async (req, res, next) => {
+  try {
+    const expenses = await expenseModel
+      .find({ userId: req.user.id })
+      .sort({ createdAt: -1 })
+      .limit(5);
 
-          tags: expense.tags,
+    return res.status(200).json({
+      success: true,
+      expenses,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
-          source: expense.source,
 
-          expenseDate:
-            new Date(),
+const searchExpenses = async (req, res, next) => {
+  try {
+    const { q } = req.query;
 
-          favorite: false,
-        })
+    const safeQ = escapeRegex(q || "");
 
-      return res.status(201).json({
-        success: true,
-        message:
-          "Expense duplicated successfully",
-
-        duplicatedExpense,
+    const expenses = await expenseModel
+      .find({
+        userId: req.user.id,
+        $or: [
+          { title: { $regex: safeQ, $options: "i" } },
+          { notes: { $regex: safeQ, $options: "i" } },
+          { merchant: { $regex: safeQ, $options: "i" } },
+        ],
       })
 
-    } catch (error) {
-      next(error)
-    }
+    return res.status(200).json({
+      success: true,
+      count: expenses.length,
+      expenses,
+    });
+  } catch (error) {
+    next(error);
   }
+};
 
 
+const duplicateExpense = async (req, res, next) => {
+  try {
+    const expense = await expenseModel.findOne({
+      _id: req.params.id,
+      userId: req.user.id,
+    });
+
+    if (!expense) {
+      return res.status(404).json({
+        success: false,
+        message: "Expense not found",
+      });
+    }
+
+    const duplicatedExpense = await expenseModel.create({
+      userId: expense.userId,
+      title: expense.title,
+      amount: expense.amount,
+      category: expense.category,
+      merchant: expense.merchant,
+      paymentMethod: expense.paymentMethod,
+      notes: expense.notes,
+      tags: expense.tags,
+      source: expense.source,
+      expenseDate: expense.expenseDate || new Date(),
+      favorite: false,
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: "Expense duplicated successfully",
+      duplicatedExpense,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
 export {
   createExpense,
@@ -600,4 +425,4 @@ export {
   getRecentExpenses,
   searchExpenses,
   duplicateExpense,
-}
+};
