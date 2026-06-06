@@ -26,31 +26,33 @@ export const parseReceipt = (text) => {
     amount = numbers.length ? Math.max(...numbers) : 0;
   }
 
-  // ---------------- DATE (FIXED) ----------------
-  const dateMatch = text.match(
-    /\b\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}\b/
-  );
+ const dateMatch = text.match(
+  /\b\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}\b/
+);
 
-  let date = null;
+let date = null;
 
-  if (dateMatch) {
-    const raw = dateMatch[0];
+if (dateMatch) {
+  const raw = dateMatch[0];
 
-    // convert DD/MM/YYYY or DD-MM-YYYY → YYYY-MM-DD
-    const parts = raw.split(/[\/.-]/);
+  const parts = raw.split(/[\/.-]/);
 
-    if (parts.length === 3) {
-      let [d, m, y] = parts;
+  if (parts.length === 3) {
+    let [d, m, y] = parts;
 
-      // fix 2-digit year
-      if (y.length === 2) {
-        y = "20" + y;
-      }
+    if (y.length === 2) {
+      y = "20" + y;
+    }
 
-      date = new Date(`${y}-${m}-${d}`);
+    const parsedDate = new Date(
+      `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`
+    );
+
+    if (!isNaN(parsedDate.getTime())) {
+      date = parsedDate;
     }
   }
-
+}
   // ---------------- CATEGORY ----------------
   const lower = text.toLowerCase();
 
