@@ -1,4 +1,3 @@
-import { notificationModel } from "../models/notificationModel.js";
 import { io } from "../index.js";
 
 export const sendNotification = async ({
@@ -7,16 +6,15 @@ export const sendNotification = async ({
   message,
 }) => {
   try {
-    const notification = await notificationModel.create({
-      userId,
-      title,
-      message,
-    });
-
-    io.to(userId).emit("notification", notification);
-
-    return notification;
-  } catch (error) {
-    console.log("Notification Error:", error.message);
+    io.to(userId.toString()).emit("notification:new", {
+  id: notification._id,
+  title,
+  message,
+  type: "info",
+  read: false,
+  createdAt: new Date().toISOString(),
+});
+  } catch (err) {
+    console.log("Socket notification error:", err.message);
   }
 };

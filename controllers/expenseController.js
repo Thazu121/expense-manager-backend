@@ -1,13 +1,16 @@
 import { expenseModel } from "../models/expenseModel.js";
 import { sendNotification } from "../utils/sendNotification.js";
 
+const escapeRegex = (text = "") => {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+};
 
 const createExpense = async (req, res, next) => {
   try {
     let {
       title,
       amount,
-      category, 
+      category,
       merchant,
       paymentMethod,
       notes,
@@ -16,6 +19,7 @@ const createExpense = async (req, res, next) => {
       expenseDate,
       isRecurring,
       recurringType,
+      recurringExpenseId,
     } = req.body;
 
     if (!title || !amount) {
@@ -27,8 +31,16 @@ const createExpense = async (req, res, next) => {
 
     const parsedAmount = Number(amount);
 
-  
-    const finalDate = expenseDate ? new Date(expenseDate) : new Date();
+    if (isNaN(parsedAmount) || parsedAmount < 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid amount",
+      });
+    }
+
+    const finalDate = expenseDate
+      ? new Date(expenseDate)
+      : new Date();
 
     if (isNaN(finalDate.getTime())) {
       return res.status(400).json({
@@ -37,7 +49,6 @@ const createExpense = async (req, res, next) => {
       });
     }
 
-    
     const startOfDay = new Date(finalDate);
     startOfDay.setHours(0, 0, 0, 0);
 
@@ -61,21 +72,21 @@ const createExpense = async (req, res, next) => {
       });
     }
 
-    
-const expense = await expenseModel.create({
-  userId: req.user.id,
-  title: title.trim(),
-  amount: parsedAmount,
-  category: category || "General",
-  merchant,
-  paymentMethod,
-  notes,
-  tags,
-  source: source || "manual",
-  expenseDate: finalDate,
-  isRecurring,
-  recurringType,
-});
+    const expense = await expenseModel.create({
+      userId: req.user.id,
+      title: title.trim(),
+      amount: parsedAmount,
+      category: category || "General",
+      merchant,
+      paymentMethod: paymentMethod || "cash",
+      notes,
+      tags,
+      source: source || "manual",
+      expenseDate: finalDate,
+      isRecurring: isRecurring || false,
+      recurringType,
+      recurringExpenseId,
+    });
 
     try {
       await sendNotification({
@@ -87,7 +98,6 @@ const expense = await expenseModel.create({
       console.log("Notification error:", err.message);
     }
 
- 
     return res.status(201).json({
       success: true,
       message: "Expense created successfully",
@@ -110,17 +120,24 @@ const getExpenses = async (req, res, next) => {
       page = 1,
       limit = 10,
       favorite,
+      source,
+      isRecurring,
     } = req.query;
 
     const pageNum = Math.max(1, Number(page));
     const limitNum = Math.min(100, Number(limit));
     const skip = (pageNum - 1) * limitNum;
 
-    let filter = { userId: req.user.id };
+    let filter = {
+      userId: req.user.id,
+    };
 
-    if (category) filter.category= category;
+    if (category) filter.category = category;
     if (paymentMethod) filter.paymentMethod = paymentMethod;
     if (favorite === "true") filter.favorite = true;
+    if (source) filter.source = source;
+    if (isRecurring === "true") filter.isRecurring = true;
+    if (isRecurring === "false") filter.isRecurring = false;
 
     if (startDate && endDate) {
       filter.expenseDate = {
@@ -139,7 +156,9 @@ const getExpenses = async (req, res, next) => {
       ];
     }
 
-    let sortOption = { createdAt: -1 };
+    let sortOption = {
+      createdAt: -1,
+    };
 
     if (sort === "oldest") sortOption = { createdAt: 1 };
     if (sort === "highest") sortOption = { amount: -1 };
@@ -168,11 +187,10 @@ const getExpenses = async (req, res, next) => {
 
 const getSingleExpense = async (req, res, next) => {
   try {
-    const expense = await expenseModel
-      .findOne({
-        _id: req.params.id,
-        userId: req.user.id,
-      })
+    const expense = await expenseModel.findOne({
+      _id: req.params.id,
+      userId: req.user.id,
+    });
 
     if (!expense) {
       return res.status(404).json({
@@ -190,7 +208,6 @@ const getSingleExpense = async (req, res, next) => {
   }
 };
 
-
 const updateExpense = async (req, res, next) => {
   try {
     const {
@@ -205,6 +222,7 @@ const updateExpense = async (req, res, next) => {
       expenseDate,
       isRecurring,
       recurringType,
+      recurringExpenseId,
     } = req.body;
 
     const expense = await expenseModel.findOne({
@@ -222,7 +240,7 @@ const updateExpense = async (req, res, next) => {
     const oldTitle = expense.title;
 
     if (title !== undefined) expense.title = title;
-    if (amount !== undefined) expense.amount = amount;
+    if (amount !== undefined) expense.amount = Number(amount);
     if (category !== undefined) expense.category = category;
     if (merchant !== undefined) expense.merchant = merchant;
     if (paymentMethod !== undefined) expense.paymentMethod = paymentMethod;
@@ -232,6 +250,9 @@ const updateExpense = async (req, res, next) => {
     if (expenseDate !== undefined) expense.expenseDate = expenseDate;
     if (isRecurring !== undefined) expense.isRecurring = isRecurring;
     if (recurringType !== undefined) expense.recurringType = recurringType;
+    if (recurringExpenseId !== undefined) {
+      expense.recurringExpenseId = recurringExpenseId;
+    }
 
     await expense.save();
 
@@ -242,7 +263,7 @@ const updateExpense = async (req, res, next) => {
         message: `${oldTitle} updated successfully`,
       });
     } catch (err) {
-      console.error("Notification error:", err);
+      console.error("Notification error:", err.message);
     }
 
     return res.status(200).json({
@@ -280,7 +301,7 @@ const deleteExpense = async (req, res, next) => {
         message: `${deletedTitle} removed successfully`,
       });
     } catch (err) {
-      console.error("Notification error:", err);
+      console.error("Notification error:", err.message);
     }
 
     return res.status(200).json({
@@ -291,7 +312,6 @@ const deleteExpense = async (req, res, next) => {
     next(error);
   }
 };
-
 
 const toggleFavoriteExpense = async (req, res, next) => {
   try {
@@ -319,7 +339,7 @@ const toggleFavoriteExpense = async (req, res, next) => {
         }`,
       });
     } catch (err) {
-      console.error("Notification error:", err);
+      console.error("Notification error:", err.message);
     }
 
     return res.status(200).json({
@@ -332,12 +352,15 @@ const toggleFavoriteExpense = async (req, res, next) => {
   }
 };
 
-
 const getRecentExpenses = async (req, res, next) => {
   try {
     const expenses = await expenseModel
-      .find({ userId: req.user.id })
-      .sort({ createdAt: -1 })
+      .find({
+        userId: req.user.id,
+      })
+      .sort({
+        createdAt: -1,
+      })
       .limit(5);
 
     return res.status(200).json({
@@ -349,22 +372,20 @@ const getRecentExpenses = async (req, res, next) => {
   }
 };
 
-
 const searchExpenses = async (req, res, next) => {
   try {
     const { q } = req.query;
 
     const safeQ = escapeRegex(q || "");
 
-    const expenses = await expenseModel
-      .find({
-        userId: req.user.id,
-        $or: [
-          { title: { $regex: safeQ, $options: "i" } },
-          { notes: { $regex: safeQ, $options: "i" } },
-          { merchant: { $regex: safeQ, $options: "i" } },
-        ],
-      })
+    const expenses = await expenseModel.find({
+      userId: req.user.id,
+      $or: [
+        { title: { $regex: safeQ, $options: "i" } },
+        { notes: { $regex: safeQ, $options: "i" } },
+        { merchant: { $regex: safeQ, $options: "i" } },
+      ],
+    });
 
     return res.status(200).json({
       success: true,
@@ -375,7 +396,6 @@ const searchExpenses = async (req, res, next) => {
     next(error);
   }
 };
-
 
 const duplicateExpense = async (req, res, next) => {
   try {
@@ -401,8 +421,11 @@ const duplicateExpense = async (req, res, next) => {
       notes: expense.notes,
       tags: expense.tags,
       source: expense.source,
-      expenseDate: expense.expenseDate || new Date(),
+      expenseDate: new Date(),
       favorite: false,
+      isRecurring: expense.isRecurring,
+      recurringType: expense.recurringType,
+      recurringExpenseId: expense.recurringExpenseId,
     });
 
     return res.status(201).json({

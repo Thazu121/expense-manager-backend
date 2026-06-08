@@ -116,17 +116,20 @@ receiptId: {
 
 
 
-    source: {
-      type: String,
-
-      enum: [
-        "manual",
-        "receipt-scan",
-        "ocr",
-      ],
-
-      default: "manual",
-    },
+source: {
+  type: String,
+  enum: [
+    "manual",
+    "receipt-scan",
+    "ocr",
+    "recurring",
+  ],
+  default: "manual",
+},
+    recurringExpenseId: {
+  type: mongoose.Schema.Types.ObjectId,
+  ref: "recurringExpense",
+},
   },
 
   {
