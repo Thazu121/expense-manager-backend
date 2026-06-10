@@ -61,6 +61,10 @@ const receiptSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    fileHash: {
+  type: String,
+  index: true,
+},
   },
   {
     timestamps: true,

@@ -5,7 +5,7 @@ import streamifier from "streamifier";
 import { receiptModel } from "../models/receiptModel.js";
 import { expenseModel } from "../models/expenseModel.js";
 import { ocrQueue } from "../queues/ocrQueue.js";
-
+import crypto from "crypto";
 const isValidId = (id) =>
 mongoose.Types.ObjectId.isValid(id);
 
@@ -27,62 +27,71 @@ streamifier
 
 });
 };
-
 export const uploadReceipt = async (req, res) => {
-try {
-if (!req.file) {
-return res.status(400).json({
-success: false,
-message: "No file uploaded",
-});
-}
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: "No file uploaded",
+      });
+    }
 
+    const fileHash = crypto
+      .createHash("sha256")
+      .update(req.file.buffer)
+      .digest("hex");
 
-const cloudinaryResult =
-  await uploadToCloudinary(
-    req.file.buffer
-  );
+    const existingReceipt = await receiptModel.findOne({
+      userId: req.user.id,
+      fileHash,
+    });
 
-const receipt =
-  await receiptModel.create({
-    userId: req.user.id,
-    imageUrl:
-      cloudinaryResult.secure_url,
-    cloudinaryId:
-      cloudinaryResult.public_id,
-    ocrStatus: "pending",
-  });
+    if (existingReceipt) {
+      return res.status(200).json({
+        success: true,
+        duplicate: true,
+        message: "Receipt already uploaded",
+        receipt: existingReceipt,
+      });
+    }
 
-await ocrQueue.add(
-  "process-ocr",
-  {
-    receiptId: receipt._id,
-    imageUrl: receipt.imageUrl,
+    const cloudinaryResult = await uploadToCloudinary(
+      req.file.buffer
+    );
+
+    const receipt = await receiptModel.create({
+      userId: req.user.id,
+      imageUrl: cloudinaryResult.secure_url,
+      cloudinaryId: cloudinaryResult.public_id,
+      fileHash,
+      ocrStatus: "pending",
+    });
+
+    await ocrQueue.add("process-ocr", {
+      receiptId: receipt._id,
+      imageUrl: receipt.imageUrl,
+    });
+
+    return res.status(201).json({
+      success: true,
+      receipt,
+    });
+  } catch (err) {
+    console.log("UPLOAD ERROR:", err);
+
+    if (err.code === 11000) {
+      return res.status(409).json({
+        success: false,
+        message: "Duplicate receipt upload blocked",
+      });
+    }
+
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
   }
-);
-
-return res.status(201).json({
-  success: true,
-  receipt,
-});
-
-
-} catch (err) {
-console.log(
-"UPLOAD ERROR:",
-err
-);
-
-
-return res.status(500).json({
-  success: false,
-  message: err.message,
-});
-
-
-}
 };
-
 export const getReceipts = async (
 req,
 res,

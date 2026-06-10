@@ -34,7 +34,12 @@ const notificationSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    uniqueKey: {
+  type: String,
+  index: true,
+},
   },
+  
   {
     timestamps: true,
   }
