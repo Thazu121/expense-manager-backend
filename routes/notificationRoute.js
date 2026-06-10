@@ -1,11 +1,45 @@
-import express from "express"
-import authMiddleware from "../middlewares/authMiddleware.js";
-import { getNotifications } from "../controllers/notificationController.js";
-import { clearNotifications } from "../controllers/notificationController.js";
-import { markRead} from "../controllers/notificationController.js";
-const notificationRoute = express.Router()
+import express from "express";
 
-notificationRoute.get("/", authMiddleware, getNotifications);
-notificationRoute.put("/read-all", authMiddleware, markRead);
-notificationRoute.delete("/", authMiddleware, clearNotifications);
-export default notificationRoute
+import authMiddleware from "../middlewares/authMiddleware.js";
+
+import {
+  getNotifications,
+  markAsRead,
+  markAllRead,
+  deleteNotification,
+  clearNotifications,
+} from "../controllers/notificationController.js";
+
+const notificationRoute =
+  express.Router();
+
+notificationRoute.use(
+  authMiddleware
+);
+
+notificationRoute.get(
+  "/",
+  getNotifications
+);
+
+notificationRoute.put(
+  "/read-all",
+  markAllRead
+);
+
+notificationRoute.put(
+  "/:id/read",
+  markAsRead
+);
+
+notificationRoute.delete(
+  "/clear",
+  clearNotifications
+);
+
+notificationRoute.delete(
+  "/:id",
+  deleteNotification
+);
+
+export default notificationRoute;

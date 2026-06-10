@@ -90,10 +90,11 @@ const createExpense = async (req, res, next) => {
 
     try {
       await sendNotification({
-        userId: req.user.id,
-        title: "Expense Added",
-        message: `${title} - ₹${amount} added successfully`,
-      });
+  userId: req.user.id,
+  title: "Expense Added",
+  message: `${title} - ₹${amount}`,
+  type: "expense",
+});
     } catch (err) {
       console.log("Notification error:", err.message);
     }
@@ -257,11 +258,12 @@ const updateExpense = async (req, res, next) => {
     await expense.save();
 
     try {
-      await sendNotification({
-        userId: req.user.id,
-        title: "Expense Updated",
-        message: `${oldTitle} updated successfully`,
-      });
+     await sendNotification({
+  userId: req.user.id,
+  title: "Expense Updated",
+  message: expense.title,
+  type: "expense",
+});
     } catch (err) {
       console.error("Notification error:", err.message);
     }
@@ -295,11 +297,12 @@ const deleteExpense = async (req, res, next) => {
     await expense.deleteOne();
 
     try {
-      await sendNotification({
-        userId: req.user.id,
-        title: "Expense Deleted",
-        message: `${deletedTitle} removed successfully`,
-      });
+     await sendNotification({
+  userId: req.user.id,
+  title: "Expense Deleted",
+  message: expense.title,
+  type: "expense",
+});
     } catch (err) {
       console.error("Notification error:", err.message);
     }

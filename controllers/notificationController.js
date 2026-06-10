@@ -1,28 +1,99 @@
 import { notificationModel } from "../models/notificationModel.js";
 
-export const getNotifications = async (req, res) => {
-  const data = await notificationModel
-    .find({ userId: req.user.id })
-    .sort({ createdAt: -1 });
+export const getNotifications =
+  async (req, res, next) => {
+    try {
+      const notifications =
+        await notificationModel
+          .find({
+            userId: req.user.id,
+          })
+          .sort({
+            createdAt: -1,
+          });
 
-  res.json({ success: true, data });
-};
+      res.json({
+        success: true,
+        notifications,
+      });
+    } catch (err) {
+      next(err);
+    }
+  };
 
-export const markRead = async (req, res) => {
-  await notificationModel.findByIdAndUpdate(req.params.id, {
-    isRead: true,
-  });
+export const markAsRead =
+  async (req, res, next) => {
+    try {
+      const notification =
+        await notificationModel.findOneAndUpdate(
+          {
+            _id: req.params.id,
+            userId: req.user.id,
+          },
+          {
+            read: true,
+          },
+          {
+            new: true,
+          }
+        );
 
-  res.json({ success: true });
-};
+      res.json({
+        success: true,
+        notification,
+      });
+    } catch (err) {
+      next(err);
+    }
+  };
 
-export const clearAll = async (req, res) => {
-  await notificationModel.deleteMany({ userId: req.user.id });
-  res.json({ success: true });
-};
+export const markAllRead =
+  async (req, res, next) => {
+    try {
+      await notificationModel.updateMany(
+        {
+          userId: req.user.id,
+        },
+        {
+          read: true,
+        }
+      );
 
-export const clearNotifications = async (req, res) => {
-  await notificationModel.deleteMany({ userId: req.user.id });
+      res.json({
+        success: true,
+      });
+    } catch (err) {
+      next(err);
+    }
+  };
 
-  res.json({ success: true });
-};
+export const deleteNotification =
+  async (req, res, next) => {
+    try {
+      await notificationModel.deleteOne({
+        _id: req.params.id,
+        userId: req.user.id,
+      });
+
+      res.json({
+        success: true,
+      });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+export const clearNotifications =
+  async (req, res, next) => {
+    try {
+      await notificationModel.deleteMany({
+        userId: req.user.id,
+      });
+
+      res.json({
+        success: true,
+      });
+    } catch (err) {
+      next(err);
+    }
+  };

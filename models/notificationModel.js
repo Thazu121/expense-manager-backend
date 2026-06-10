@@ -11,7 +11,6 @@ const notificationSchema = new mongoose.Schema(
     title: {
       type: String,
       required: true,
-      trim: true,
     },
 
     message: {
@@ -22,16 +21,16 @@ const notificationSchema = new mongoose.Schema(
     type: {
       type: String,
       enum: [
-        "expense_added",
-        "expense_updated",
-        "expense_deleted",
-        "favorite",
+        "expense",
+        "receipt",
+        "recurring",
+        "report",
         "system",
       ],
       default: "system",
     },
 
-    isRead: {
+    read: {
       type: Boolean,
       default: false,
     },
@@ -39,9 +38,10 @@ const notificationSchema = new mongoose.Schema(
   {
     timestamps: true,
   }
-)
+);
 
-export const notificationModel = mongoose.model(
-  "notification",
-  notificationSchema
-)
+export const notificationModel =
+  mongoose.model(
+    "notification",
+    notificationSchema
+  );
