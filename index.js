@@ -28,7 +28,6 @@ const server = http.createServer(app);
 export const io = new Server(server, {
   cors: {
     origin: [
-      "http://localhost:5173",
       "https://receipt-expense-manager.vercel.app",
     ],
     credentials: true,
@@ -38,7 +37,6 @@ export const io = new Server(server, {
 app.use(
   cors({
     origin: [
-      "http://localhost:5173",
       "https://receipt-expense-manager.vercel.app",
     ],
     credentials: true,
