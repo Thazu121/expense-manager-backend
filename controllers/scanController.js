@@ -1,9 +1,28 @@
 import sharp from "sharp";
 import Tesseract from "tesseract.js";
 import mongoose from "mongoose";
+import streamifier from "streamifier";
 
+import cloudinary from "../utils/cloudinary.js";
 import { parseReceipt } from "../utils/receiptParser.js";
 import { receiptModel } from "../models/receiptModel.js";
+
+const uploadToCloudinary = (buffer) => {
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      {
+        folder: "receipt-scans",
+        resource_type: "image",
+      },
+      (error, result) => {
+        if (error) reject(error);
+        else resolve(result);
+      }
+    );
+
+    streamifier.createReadStream(buffer).pipe(stream);
+  });
+};
 
 export const scanReceiptController = async (req, res, next) => {
   try {
@@ -14,9 +33,11 @@ export const scanReceiptController = async (req, res, next) => {
       });
     }
 
-    const imageInput = req.file.buffer || req.file.path;
+    const originalImage = req.file.buffer;
 
-    const processedImage = await sharp(imageInput)
+    const uploadResult = await uploadToCloudinary(originalImage);
+
+    const processedImage = await sharp(originalImage)
       .resize({
         width: 1800,
         withoutEnlargement: true,
@@ -27,20 +48,19 @@ export const scanReceiptController = async (req, res, next) => {
       .png()
       .toBuffer();
 
-    const result = await Tesseract.recognize(
-      processedImage,
-      "eng"
-    );
+    const result = await Tesseract.recognize(processedImage, "eng");
 
     const text = result.data.text || "";
-    const confidence = Math.round(
-      result.data.confidence || 0
-    );
+    const confidence = Math.round(result.data.confidence || 0);
 
     const parsed = parseReceipt(text);
 
     const receiptData = {
-      userId: req.user?.id,
+      userId: req.user.id,
+
+      imageUrl: uploadResult.secure_url,
+      cloudinaryId: uploadResult.public_id,
+
       extractedText: text,
       merchantName: parsed.merchant || "Unknown",
       extractedAmount: parsed.amount || 0,
@@ -48,10 +68,9 @@ export const scanReceiptController = async (req, res, next) => {
       category: parsed.category || "General",
       confidenceScore: confidence,
       ocrStatus: "completed",
-      source: "ocr",
     };
 
-    let receipt = null;
+    let receipt;
 
     const receiptId = req.body?.receiptId;
 
@@ -62,12 +81,10 @@ export const scanReceiptController = async (req, res, next) => {
       receipt = await receiptModel.findOneAndUpdate(
         {
           _id: receiptId,
-          userId: req.user?.id,
+          userId: req.user.id,
         },
         receiptData,
-        {
-          new: true,
-        }
+        { new: true }
       );
     } else {
       receipt = await receiptModel.create(receiptData);
@@ -75,8 +92,10 @@ export const scanReceiptController = async (req, res, next) => {
 
     return res.status(200).json({
       success: true,
-      receiptId: receipt?._id,
+      message: "Receipt scanned and saved successfully",
+      receiptId: receipt._id,
       receipt,
+      imageUrl: receipt.imageUrl,
       confidence,
       data: {
         merchant: parsed.merchant || "Unknown",
