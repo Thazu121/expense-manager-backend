@@ -3,7 +3,7 @@ import Tesseract from "tesseract.js";
 import mongoose from "mongoose";
 import streamifier from "streamifier";
 
-import cloudinary from "../utils/cloudinary.js";
+import cloudinary from "../config/cloudinary.js"
 import { parseReceipt } from "../utils/receiptParser.js";
 import { receiptModel } from "../models/receiptModel.js";
 
